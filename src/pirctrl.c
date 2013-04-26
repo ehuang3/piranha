@@ -52,33 +52,59 @@
 
 
 typedef struct {
-    ach_channel_t chanjs;
+    ach_channel_t chan_js;
+    ach_channel_t chan_torso;
     struct sns_msg_joystick *jsmsg;
+    struct sns_msg_motor_ref *torso_msg;
 } cx_t;
 
 cx_t cx;
 
-int main() {
+#define MAXVEL_DEG_PER_SEC 20
+#define JS_AXES 8
 
+int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
 
-    cx.jsmsg = sns_msg_joystick_alloc( 8 );
+    /*-- args --*/
+    for( int c; -1 != (c = getopt(argc, argv, "V?hH" SNS_OPTSTRING)); ) {
+        switch(c) {
+            SNS_OPTCASES;
+        default:
+            sns_die( 0, "Invalid argument: %s\n", optarg );
+        }
+    }
+
+
+    cx.jsmsg = sns_msg_joystick_alloc( JS_AXES );
+    cx.torso_msg = sns_msg_motor_ref_alloc( 1 );
+    cx.torso_msg->mode = SNS_MOTOR_MODE_VEL;
 
     sns_start();
 
-    sns_chan_open( &cx.chanjs, "joystick", NULL );
+    sns_chan_open( &cx.chan_js, "joystick", NULL );
+    sns_chan_open( &cx.chan_torso, "ref-torso", NULL );
 
+    /* -- RUN -- */
     while (!sns_cx.shutdown) {
         size_t frame_size;
-        ach_status_t r = ach_get( &cx.chanjs, cx.jsmsg, sns_msg_joystick_size(cx.jsmsg), &frame_size,
+        ach_status_t r = ach_get( &cx.chan_js, cx.jsmsg, sns_msg_joystick_size(cx.jsmsg), &frame_size,
                                   NULL, ACH_O_WAIT | ACH_O_LAST );
         SNS_REQUIRE( ACH_OK == r || ACH_MISSED_FRAME == r || ACH_TIMEOUT == r,
                      "Failed to get frame: %s\n", ach_result_to_string(r) );
 
-        sns_msg_joystick_dump( stderr, cx.jsmsg );
+        if( SNS_LOG_PRIORITY( LOG_DEBUG + 1 ) ) {
+            sns_msg_joystick_dump( stderr, cx.jsmsg );
+        }
+
+        // validate js message
+        if( cx.jsmsg->n == JS_AXES && frame_size == sns_msg_joystick_size(cx.jsmsg) ) {
+
+            cx.torso_msg->u[0] = cx.jsmsg->axis[0] * MAXVEL_DEG_PER_SEC * M_PI / 180;
+            r = ach_put( &cx.chan_torso, cx.torso_msg, sns_msg_motor_ref_size(cx.torso_msg) );
+        }
     }
 
-
-
+    sns_end();
     return 0;
 }
