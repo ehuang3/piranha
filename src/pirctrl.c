@@ -63,6 +63,8 @@ cx_t cx;
 #define MAXVEL_DEG_PER_SEC 20
 #define JS_AXES 8
 
+#define VALID_NS (1000000000 / 5)
+
 int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
 
@@ -93,14 +95,19 @@ int main( int argc, char **argv ) {
         SNS_REQUIRE( ACH_OK == r || ACH_MISSED_FRAME == r || ACH_TIMEOUT == r,
                      "Failed to get frame: %s\n", ach_result_to_string(r) );
 
+        struct timespec now;
+        if( clock_gettime( ACH_DEFAULT_CLOCK, &now ) )
+            SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
+
         if( SNS_LOG_PRIORITY( LOG_DEBUG + 1 ) ) {
             sns_msg_joystick_dump( stderr, cx.jsmsg );
         }
 
         // validate js message
         if( cx.jsmsg->n == JS_AXES && frame_size == sns_msg_joystick_size(cx.jsmsg) ) {
-
             cx.torso_msg->u[0] = cx.jsmsg->axis[0] * MAXVEL_DEG_PER_SEC * M_PI / 180;
+            sns_msg_set_time( &cx.torso_msg->header, &now, VALID_NS );
+            cx.torso_msg->header.seq++;
             r = ach_put( &cx.chan_torso, cx.torso_msg, sns_msg_motor_ref_size(cx.torso_msg) );
         }
     }
