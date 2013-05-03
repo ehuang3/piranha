@@ -263,12 +263,20 @@ static void control_n( uint32_t n, size_t i, ach_channel_t *chan ) {
 
 
 static void ctrl_joint_torso(void) {
-    double u = cx.jsmsg->axis[GAMEPAD_AXIS_LT] - cx.jsmsg->axis[GAMEPAD_AXIS_RT];
+    double u = cx.jsmsg->axis[GAMEPAD_AXIS_RT] - cx.jsmsg->axis[GAMEPAD_AXIS_LT];
     cx.ref.dq[PIR_AXIS_T] = u * MAXVEL_FACTOR;
 }
 static void ctrl_joint_left_shoulder(void) {
     ctrl_joint_torso();
+    cx.ref.dq[PIR_AXIS_L0] = cx.jsmsg->axis[GAMEPAD_AXIS_LY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L1] = cx.jsmsg->axis[GAMEPAD_AXIS_LX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L2] = cx.jsmsg->axis[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L3] = cx.jsmsg->axis[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
 }
 static void ctrl_joint_left_wrist(void) {
     ctrl_joint_torso();
+    cx.ref.dq[PIR_AXIS_L3] = cx.jsmsg->axis[GAMEPAD_AXIS_LX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L4] = cx.jsmsg->axis[GAMEPAD_AXIS_LY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L5] = cx.jsmsg->axis[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L6] = cx.jsmsg->axis[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
 }
