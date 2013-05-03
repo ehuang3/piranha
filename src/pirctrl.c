@@ -49,21 +49,40 @@
 #include <signal.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <gamepad.h>
 
 
 typedef struct {
     ach_channel_t chan_js;
     ach_channel_t chan_torso;
+    ach_channel_t chan_left;
+    ach_channel_t chan_ctrl;
     struct sns_msg_joystick *jsmsg;
     struct sns_msg_motor_ref *torso_msg;
 } cx_t;
 
 cx_t cx;
 
+enum pir_mode {
+    MODE_HALT = 0,
+    MODE_TORSO = 1,
+    MODE_L_SHOULDER = 2,
+    MODE_L_WRIST = 3,
+    MODE_R_SHOULDER = 4,
+    MODE_R_WRIST = 5,
+};
+
+struct pir_msg {
+    char mode[64];
+};
+
+
 #define MAXVEL_DEG_PER_SEC 20
 #define JS_AXES 8
 
 #define VALID_NS (1000000000 / 5)
+
+static void set_mode(void);
 
 int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
@@ -86,14 +105,19 @@ int main( int argc, char **argv ) {
 
     sns_chan_open( &cx.chan_js, "joystick", NULL );
     sns_chan_open( &cx.chan_torso, "ref-torso", NULL );
+    sns_chan_open( &cx.chan_left, "ref-left", NULL );
+    sns_chan_open( &cx.chan_ctrl, "pir-ctrl", NULL );
 
     /* -- RUN -- */
     while (!sns_cx.shutdown) {
         size_t frame_size;
+        // get joystick
         ach_status_t r = ach_get( &cx.chan_js, cx.jsmsg, sns_msg_joystick_size(cx.jsmsg), &frame_size,
                                   NULL, ACH_O_WAIT | ACH_O_LAST );
         SNS_REQUIRE( ACH_OK == r || ACH_MISSED_FRAME == r || ACH_TIMEOUT == r,
                      "Failed to get frame: %s\n", ach_result_to_string(r) );
+
+        set_mode();
 
         struct timespec now;
         if( clock_gettime( ACH_DEFAULT_CLOCK, &now ) )
@@ -114,4 +138,17 @@ int main( int argc, char **argv ) {
 
     sns_end();
     return 0;
+}
+
+static void set_mode(void) {
+
+    // poll mode
+    size_t frame_size;
+    struct pir_msg msg_ctrl;
+    ach_status_t r = ach_get( &cx.chan_ctrl, &msg_ctrl, sizeof(msg_ctrl), &frame_size,
+                 NULL, ACH_O_LAST );
+    if( ACH_OK == r || ACH_MISSED_FRAME == r ) {
+        msg_ctrl.mode[63] = '\0';
+        printf("ctrl: %s\n", msg_ctrl.mode);
+    }
 }
