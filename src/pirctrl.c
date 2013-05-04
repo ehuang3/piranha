@@ -221,10 +221,13 @@ static void update(void) {
                      "Failed to get frame: %s\n", ach_result_to_string(r) );
 
         // validate
-        if( !(ACH_OK == r || ACH_MISSED_FRAME == r) ||
-            cx.jsmsg->n != JS_AXES ||
-            frame_size != sns_msg_joystick_size(cx.jsmsg) )
+        if( (ACH_TIMEOUT == r || ACH_STALE_FRAMES == r) ) {
+            ;// pass
+        } else if( (ACH_OK == r || ACH_MISSED_FRAME == r) &&
+                   (cx.jsmsg->n != JS_AXES ||
+                    frame_size != sns_msg_joystick_size(cx.jsmsg) ) )
         {
+            printf("bad js\n");
             memset( cx.jsmsg->axis, 0, sizeof(cx.jsmsg->axis[0])*JS_AXES );
             cx.jsmsg->buttons = 0;
         } else {
