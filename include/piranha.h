@@ -43,6 +43,30 @@
 #ifndef PIRANHA_H
 #define PIRANHA_H
 
+#define PIR_MAX_MSG_AXES 7
+
+enum pir_axis {
+    PIR_AXIS_T  = 0,
+    PIR_AXIS_L0 = 1,
+    PIR_AXIS_L1 = 2,
+    PIR_AXIS_L2 = 3,
+    PIR_AXIS_L3 = 4,
+    PIR_AXIS_L4 = 5,
+    PIR_AXIS_L5 = 6,
+    PIR_AXIS_L6 = 7,
+    PIR_AXIS_CNT = 8
+};
+
+struct pir_state {
+    double q[PIR_AXIS_CNT];
+    double dq[PIR_AXIS_CNT];
+
+    double Tee[12];
+    double T0[12];
+    double T[12];
+    double J[7*6];
+};
+
 void lwa4_kin_( const double *q, const double *T0, const double *Tee, double *T, double *J );
 
 #endif //PIRANHA_H

@@ -53,22 +53,6 @@
 #include <amino.h>
 #include "piranha.h"
 
-#define PIR_MAX_MSG_AXES 7
-
-enum pir_axis {
-    PIR_AXIS_T  = 0,
-    PIR_AXIS_L0 = 1,
-    PIR_AXIS_L1 = 2,
-    PIR_AXIS_L2 = 3,
-    PIR_AXIS_L3 = 4,
-    PIR_AXIS_L4 = 5,
-    PIR_AXIS_L5 = 6,
-    PIR_AXIS_L6 = 7,
-    PIR_AXIS_CNT = 8
-};
-
-
-
 enum pir_mode {
     MODE_HALT = 0,
     MODE_TORSO = 1,
@@ -87,22 +71,12 @@ typedef struct {
     ach_channel_t chan_js;
     ach_channel_t chan_ref_torso;
     ach_channel_t chan_ref_left;
-    ach_channel_t chan_state_torso;
-    ach_channel_t chan_state_left;
+    ach_channel_t chan_state_pir;
     ach_channel_t chan_ctrl;
     struct sns_msg_joystick *jsmsg;
     struct sns_msg_motor_ref *msg_ref;
-    struct sns_msg_motor_state *msg_state;
     struct pir_msg msg_ctrl;
-    struct {
-        double q[PIR_AXIS_CNT];
-        double dq[PIR_AXIS_CNT];
-
-        double Tee[12];
-        double T0[12];
-        double T[12];
-        double J[7*6];
-    } state;
+    struct pir_state state;
     struct {
         double dq[PIR_AXIS_CNT];
     } ref;
@@ -122,7 +96,6 @@ cx_t cx;
 
 static void set_mode(void);
 static void update(void);
-static void update_n(size_t n, size_t i, ach_channel_t *chan );
 static void control(void);
 
 // all the different control modes
@@ -154,12 +127,10 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_ctrl,        "pir-ctrl",    NULL );
     sns_chan_open( &cx.chan_ref_torso,   "ref-torso",   NULL );
     sns_chan_open( &cx.chan_ref_left,    "ref-left",    NULL );
-    sns_chan_open( &cx.chan_state_torso, "state-torso", NULL );
-    sns_chan_open( &cx.chan_state_left,  "state-left",  NULL );
+    sns_chan_open( &cx.chan_state_pir,   "pir-state",   NULL );
 
     // alloc messages
     cx.msg_ref = sns_msg_motor_ref_alloc( PIR_MAX_MSG_AXES );
-    cx.msg_state = sns_msg_motor_state_alloc( PIR_MAX_MSG_AXES );
     cx.jsmsg = sns_msg_joystick_alloc( JS_AXES );
     cx.msg_ref->mode = SNS_MOTOR_MODE_VEL;
 
@@ -182,25 +153,6 @@ int main( int argc, char **argv ) {
 
     sns_end();
     return 0;
-}
-
-static void update_n(size_t n, size_t i, ach_channel_t *chan ) {
-    size_t frame_size;
-    cx.msg_state->n = (uint32_t)n;
-    size_t expected = sns_msg_motor_state_size_n(n);
-    ach_status_t r = ach_get( chan, cx.msg_state,
-                              expected, &frame_size,
-                 NULL, ACH_O_LAST );
-    // TODO: better validation
-    if( (ACH_OK == r || ACH_MISSED_FRAME == r) &&
-        n == cx.msg_state->n &&
-        frame_size == expected )
-    {
-        for( size_t j = 0; j < n; j++ ) {
-            cx.state.q[i+j] =  cx.msg_state->X[j].pos;
-            cx.state.dq[i+j] = cx.msg_state->X[j].vel;
-        }
-    }
 }
 
 static void update(void) {
@@ -231,21 +183,20 @@ static void update(void) {
         }
     }
 
-    // axes
-    update_n(1, PIR_AXIS_T,  &cx.chan_state_torso);
-    update_n(7, PIR_AXIS_L0, &cx.chan_state_left);
+    // state
+    {
+        size_t frame_size;
+
+        ach_status_t r = ach_get( &cx.chan_state_pir, &cx.state, sizeof(cx.state), &frame_size,
+                                  NULL, ACH_O_LAST );
+        SNS_REQUIRE( ( (ACH_OK == r || ACH_MISSED_FRAME == r) && frame_size == sizeof(cx.state) ) ||
+                     ACH_STALE_FRAMES == r,
+                     "Failed to get frame: %s\n", ach_result_to_string(r) );
+
+    }
 
     //mode
     set_mode();
-
-    // kinematics
-
-    lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.state.T0, cx.state.Tee,
-               cx.state.T, cx.state.J );
-    printf( "%f\t%f\t%f\n",
-            cx.state.T[9],
-            cx.state.T[10],
-            cx.state.T[11] );
 }
 
 
