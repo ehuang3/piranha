@@ -237,7 +237,7 @@ static void control(void) {
 }
 
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan ) {
-    memcpy( &cx.msg_ref->u[0], &cx.ref.dq[i], sizeof(cx.msg_ref[0])*n );
+    memcpy( &cx.msg_ref->u[0], &cx.ref.dq[i], sizeof(cx.msg_ref->u[0])*n );
     cx.msg_ref->mode = SNS_MOTOR_MODE_VEL;
     cx.msg_ref->n = n;
     ach_put( chan, cx.msg_ref, sns_msg_motor_ref_size(cx.msg_ref) );
