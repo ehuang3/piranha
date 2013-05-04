@@ -51,6 +51,7 @@
 #include <inttypes.h>
 #include <gamepad.h>
 #include <amino.h>
+#include <reflex.h>
 #include "piranha.h"
 
 enum pir_mode {
@@ -78,9 +79,14 @@ typedef struct {
     struct pir_msg msg_ctrl;
     struct pir_state state;
     struct {
+        double  q[PIR_AXIS_CNT];
         double dq[PIR_AXIS_CNT];
     } ref;
     struct timespec now;
+    rfx_ctrl_t G;
+    rfx_ctrl_ws_lin_k_t K;
+    double q_min[PIR_AXIS_CNT];
+    double q_max[PIR_AXIS_CNT];
 } cx_t;
 
 cx_t cx;
@@ -102,6 +108,7 @@ static void control(void);
 typedef void (*ctrl_fun_t)(void);
 static void ctrl_joint_left_shoulder(void);
 static void ctrl_joint_left_wrist(void);
+static void ctrl_ws_left(void);
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
 
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
@@ -133,6 +140,34 @@ int main( int argc, char **argv ) {
     cx.msg_ref = sns_msg_motor_ref_alloc( PIR_MAX_MSG_AXES );
     cx.jsmsg = sns_msg_joystick_alloc( JS_AXES );
     cx.msg_ref->mode = SNS_MOTOR_MODE_VEL;
+
+    // setup reflex controller
+    rfx_ctrl_ws_lin_k_init( &cx.K, 7 );
+    cx.G.n_q = 7;
+    cx.G.J =  cx.state.J;
+    cx.G.q =  &cx.state.q[PIR_AXIS_L0];
+    cx.G.dq = &cx.state.dq[PIR_AXIS_L0];
+    cx.G.q_r =  &cx.ref.q[PIR_AXIS_L0];
+    cx.G.dq_r = &cx.ref.dq[PIR_AXIS_L0];
+    cx.G.q_min = &cx.q_min[PIR_AXIS_L0];
+    cx.G.q_max = &cx.q_max[PIR_AXIS_L0];
+    for( size_t i = 0; i < PIR_AXIS_CNT; i ++ ) {
+        cx.q_min[i] = -2*M_PI;
+        cx.q_max[i] = M_PI;
+    }
+    for( size_t i = 0; i < 3; i ++ ) {
+        cx.G.x_min[i] = -10;
+        cx.G.x_max[i] = 10;
+    }
+    aa_fset( cx.K.q, 0.1, 7 );
+    aa_fset( cx.K.f, 0, 6 );
+    aa_fset( cx.K.p, 0.5, 3 );
+    aa_fset( cx.K.p+3, 0.5, 3 );
+    cx.K.dls = .000;
+
+    aa_mem_region_local_init(64*1024);
+    aa_mem_region_local_alloc(728);
+    aa_mem_region_local_release();
 
     /* -- RUN -- */
     while (!sns_cx.shutdown) {
@@ -192,7 +227,6 @@ static void update(void) {
         SNS_REQUIRE( ( (ACH_OK == r || ACH_MISSED_FRAME == r) && frame_size == sizeof(cx.state) ) ||
                      ACH_STALE_FRAMES == r,
                      "Failed to get frame: %s\n", ach_result_to_string(r) );
-
     }
 
     //mode
@@ -208,6 +242,12 @@ static void set_mode(void) {
     if( ACH_OK == r || ACH_MISSED_FRAME == r ) {
         cx.msg_ctrl.mode[63] = '\0';
         printf("ctrl: %s %"PRId64"\n", cx.msg_ctrl.mode, cx.msg_ctrl.i);
+
+        if( 0 == strcmp("ws-left", cx.msg_ctrl.mode ) ) {
+            memcpy( cx.G.x_r, &cx.state.T[9], sizeof(cx.G.x_r[0]) * 3 );
+            aa_tf_rotmat2quat( cx.state.T, cx.G.r_r );
+
+        }
     }
 }
 
@@ -220,6 +260,7 @@ static void control(void) {
     } cmds[] = {
         {"teleop-left-shoulder", ctrl_joint_left_shoulder},
         {"teleop-left-wrist", ctrl_joint_left_wrist},
+        {"ws-left", ctrl_ws_left},
         {NULL, NULL} };
 
     for( size_t i = 0; cmds[i].name != NULL; i ++ ) {
@@ -263,4 +304,43 @@ static void ctrl_joint_left_wrist(void) {
     cx.ref.dq[PIR_AXIS_L4] = cx.jsmsg->axis[GAMEPAD_AXIS_LY] * MAXVEL_FACTOR;
     cx.ref.dq[PIR_AXIS_L5] = cx.jsmsg->axis[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
     cx.ref.dq[PIR_AXIS_L6] = cx.jsmsg->axis[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
+}
+
+
+static void ctrl_ws_left(void) {
+    // set actuals
+    memcpy( cx.G.x, &cx.state.T[9], sizeof(cx.G.x[0]) * 3 );
+    aa_tf_rotmat2quat( cx.state.T, cx.G.r );
+
+    // set refs
+    cx.G.dx_r[0] = cx.jsmsg->axis[GAMEPAD_AXIS_LX] * .05;
+    cx.G.dx_r[1] = cx.jsmsg->axis[GAMEPAD_AXIS_LY] * .05;
+    cx.G.dx_r[2] = cx.jsmsg->axis[GAMEPAD_AXIS_RX] * .05;
+
+    //printf("x_r: ");
+    //aa_dump_vec( stdout, cx.G.x_r, 3 );
+    // compute stuff
+    int r = rfx_ctrl_ws_lin_vfwd( &cx.G,
+                                  &cx.K,
+                                  &cx.ref.dq[PIR_AXIS_L0] );
+    printf("ref: ");
+    for( size_t i = 0; i < 7; i ++  ) {
+        printf("%f\t",
+               cx.ref.dq[PIR_AXIS_L0+i] );
+    }
+    printf("\n");
+    if( RFX_OK != r ) {
+        SNS_LOG( LOG_ERR, "ws error: %s\n",
+                 rfx_status_string((rfx_status_t)r) );
+    }
+
+    // integrate
+    /* double xr[3]; */
+    /* aa_tf_quat2rotvec( cx->X.arm[KRANG_I_LEFT].G.r_r, xr ); */
+    /* aa_la_axpy(3, dt, cx->X.arm[KRANG_I_LEFT].G.dx_r, */
+    /*            cx->X.arm[KRANG_I_LEFT].G.x_r ); */
+    /* aa_la_axpy(3, dt, cx->X.arm[KRANG_I_LEFT].G.dx_r + 3, */
+    /*            xr ); */
+    /* aa_tf_rotvec2quat( xr, cx->X.arm[KRANG_I_LEFT].G.r_r ); */
+
 }

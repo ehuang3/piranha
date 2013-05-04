@@ -4,7 +4,7 @@ AM_CPPFLAGS = -I$(top_srcdir)/include
 bin_PROGRAMS = pirctrl pirfilt
 
 pirctrl_SOURCES = src/pirctrl.c
-pirctrl_LDADD = -lsns -lach
+pirctrl_LDADD = -lsns -lach  -lreflex -lamino
 
 pirfilt_SOURCES = src/pirfilt.c kinematics.f
 pirfilt_LDADD = -lsns -lach
