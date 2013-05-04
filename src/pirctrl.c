@@ -40,7 +40,7 @@
  *
  */
 
-/** Author: jscholz, Neil Dantam
+/** Author: Neil Dantam
  */
 
 #include <argp.h>
@@ -50,6 +50,8 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <gamepad.h>
+#include <amino.h>
+#include "piranha.h"
 
 #define PIR_MAX_MSG_AXES 7
 
@@ -95,6 +97,11 @@ typedef struct {
     struct {
         double q[PIR_AXIS_CNT];
         double dq[PIR_AXIS_CNT];
+
+        double Tee[12];
+        double T0[12];
+        double T[12];
+        double J[7*6];
     } state;
     struct {
         double dq[PIR_AXIS_CNT];
@@ -124,8 +131,12 @@ static void ctrl_joint_left_shoulder(void);
 static void ctrl_joint_left_wrist(void);
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
 
+static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
+
 int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
+    memcpy( cx.state.Tee, tf_ident, 12*sizeof(cx.state.Tee[0]) );
+    memcpy( cx.state.T0, tf_ident, 12*sizeof(cx.state.T0[0]) );
 
     /*-- args --*/
     for( int c; -1 != (c = getopt(argc, argv, "V?hH" SNS_OPTSTRING)); ) {
@@ -154,22 +165,9 @@ int main( int argc, char **argv ) {
 
     /* -- RUN -- */
     while (!sns_cx.shutdown) {
-        size_t frame_size;
-        size_t max_size = sns_msg_joystick_size_n( JS_AXES );
-        // get joystick
-        ach_status_t r = ach_get( &cx.chan_js, cx.jsmsg, max_size, &frame_size,
-                                  NULL, ACH_O_WAIT | ACH_O_LAST );
-        SNS_REQUIRE( ACH_OK == r || ACH_MISSED_FRAME == r || ACH_TIMEOUT == r,
-                     "Failed to get frame: %s\n", ach_result_to_string(r) );
-
-        // validate
-        if( cx.jsmsg->n != JS_AXES || frame_size != sns_msg_joystick_size(cx.jsmsg) ) {
-            memset( cx.jsmsg->axis, 0, sizeof(cx.jsmsg->axis[0])*JS_AXES );
-        }
 
         // get state
         update();
-        printf("%f\n", cx.state.q[0]);
 
         if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
             SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
@@ -207,12 +205,47 @@ static void update_n(size_t n, size_t i, ach_channel_t *chan ) {
 
 static void update(void) {
     // joystick
+    {
+        size_t frame_size;
+        size_t max_size = sns_msg_joystick_size_n( JS_AXES );
+        // get joystick
+        ach_status_t r = ach_get( &cx.chan_js, cx.jsmsg, max_size, &frame_size,
+                                  NULL, ACH_O_WAIT | ACH_O_LAST );
+        SNS_REQUIRE( ACH_OK == r || ACH_MISSED_FRAME == r || ACH_TIMEOUT == r,
+                     "Failed to get frame: %s\n", ach_result_to_string(r) );
+
+        // validate
+        if( !(ACH_OK == r || ACH_MISSED_FRAME == r) ||
+            cx.jsmsg->n != JS_AXES ||
+            frame_size != sns_msg_joystick_size(cx.jsmsg) )
+        {
+            memset( cx.jsmsg->axis, 0, sizeof(cx.jsmsg->axis[0])*JS_AXES );
+            cx.jsmsg->buttons = 0;
+        } else {
+            if( cx.jsmsg->buttons & GAMEPAD_BUTTON_BACK ) {
+                if( strcmp(cx.msg_ctrl.mode, "halt") ) {
+                    printf("HALT\n");
+                }
+                strcpy( cx.msg_ctrl.mode, "halt" );
+            }
+        }
+    }
 
     // axes
     update_n(1, PIR_AXIS_T,  &cx.chan_state_torso);
     update_n(7, PIR_AXIS_L0, &cx.chan_state_left);
+
     //mode
     set_mode();
+
+    // kinematics
+
+    lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.state.T0, cx.state.Tee,
+               cx.state.T, cx.state.J );
+    printf( "%f\t%f\t%f\n",
+            cx.state.T[9],
+            cx.state.T[10],
+            cx.state.T[11] );
 }
 
 
