@@ -165,9 +165,9 @@ int main( int argc, char **argv ) {
     aa_fset( cx.K.p+3, 0.5, 3 );
     cx.K.dls = .000;
 
-    aa_mem_region_local_init(64*1024);
-    aa_mem_region_local_alloc(728);
-    aa_mem_region_local_release();
+
+    if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
+        SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
 
     /* -- RUN -- */
     while (!sns_cx.shutdown) {
@@ -175,8 +175,8 @@ int main( int argc, char **argv ) {
         // get state
         update();
 
-        if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
-            SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
+        //if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
+            //SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
 
         if( SNS_LOG_PRIORITY( LOG_DEBUG + 1 ) ) {
             sns_msg_joystick_dump( stderr, cx.jsmsg );
@@ -184,6 +184,10 @@ int main( int argc, char **argv ) {
 
         // control
         control();
+
+        cx.now = sns_time_add_ns(cx.now, 1000*1000*10 );
+        clock_nanosleep( ACH_DEFAULT_CLOCK, TIMER_ABSTIME,
+                         &cx.now, NULL );
     }
 
     sns_end();
@@ -191,14 +195,29 @@ int main( int argc, char **argv ) {
 }
 
 static void update(void) {
+
+    // state
+    {
+        size_t frame_size;
+        //struct timespec timeout = sns_time_add_ns( cx.now, 1000*1000*10 );
+        ach_status_t r = ach_get( &cx.chan_state_pir, &cx.state, sizeof(cx.state), &frame_size,
+                                  NULL, ACH_O_LAST );
+        SNS_REQUIRE( ( (ACH_OK == r || ACH_MISSED_FRAME == r) && frame_size == sizeof(cx.state) ) ||
+                     ACH_TIMEOUT == r ||
+                     ACH_STALE_FRAMES == r,
+                     "Failed to get frame: %s\n", ach_result_to_string(r) );
+    }
+
+
     // joystick
     {
         size_t frame_size;
         size_t max_size = sns_msg_joystick_size_n( JS_AXES );
         // get joystick
         ach_status_t r = ach_get( &cx.chan_js, cx.jsmsg, max_size, &frame_size,
-                                  NULL, ACH_O_WAIT | ACH_O_LAST );
-        SNS_REQUIRE( ACH_OK == r || ACH_MISSED_FRAME == r || ACH_TIMEOUT == r,
+                                  NULL,  ACH_O_LAST );
+
+        SNS_REQUIRE( ( ACH_OK == r || ACH_MISSED_FRAME == r || ACH_STALE_FRAMES == r ),
                      "Failed to get frame: %s\n", ach_result_to_string(r) );
 
         // validate
@@ -218,16 +237,6 @@ static void update(void) {
         }
     }
 
-    // state
-    {
-        size_t frame_size;
-
-        ach_status_t r = ach_get( &cx.chan_state_pir, &cx.state, sizeof(cx.state), &frame_size,
-                                  NULL, ACH_O_LAST );
-        SNS_REQUIRE( ( (ACH_OK == r || ACH_MISSED_FRAME == r) && frame_size == sizeof(cx.state) ) ||
-                     ACH_STALE_FRAMES == r,
-                     "Failed to get frame: %s\n", ach_result_to_string(r) );
-    }
 
     //mode
     set_mode();
@@ -317,18 +326,10 @@ static void ctrl_ws_left(void) {
     cx.G.dx_r[1] = cx.jsmsg->axis[GAMEPAD_AXIS_LY] * .05;
     cx.G.dx_r[2] = cx.jsmsg->axis[GAMEPAD_AXIS_RX] * .05;
 
-    //printf("x_r: ");
-    //aa_dump_vec( stdout, cx.G.x_r, 3 );
     // compute stuff
     int r = rfx_ctrl_ws_lin_vfwd( &cx.G,
                                   &cx.K,
                                   &cx.ref.dq[PIR_AXIS_L0] );
-    printf("ref: ");
-    for( size_t i = 0; i < 7; i ++  ) {
-        printf("%f\t",
-               cx.ref.dq[PIR_AXIS_L0+i] );
-    }
-    printf("\n");
     if( RFX_OK != r ) {
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );
