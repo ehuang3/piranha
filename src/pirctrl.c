@@ -109,6 +109,7 @@ typedef void (*ctrl_fun_t)(void);
 static void ctrl_joint_left_shoulder(void);
 static void ctrl_joint_left_wrist(void);
 static void ctrl_ws_left(void);
+static void ctrl_zero(void);
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
 
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
@@ -273,6 +274,7 @@ static void control(void) {
         {"teleop-left-shoulder", ctrl_joint_left_shoulder},
         {"teleop-left-wrist", ctrl_joint_left_wrist},
         {"ws-left", ctrl_ws_left},
+        {"zero", ctrl_zero},
         {NULL, NULL} };
 
     for( size_t i = 0; cmds[i].name != NULL; i ++ ) {
@@ -318,6 +320,13 @@ static void ctrl_joint_left_wrist(void) {
     cx.ref.dq[PIR_AXIS_L6] = cx.jsmsg->axis[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
 }
 
+
+static void ctrl_zero(void) {
+    for( size_t i = PIR_AXIS_L0; i <= PIR_AXIS_L6; i ++ ) {
+        double k = -cx.jsmsg->axis[GAMEPAD_AXIS_LT] + cx.jsmsg->axis[GAMEPAD_AXIS_RT];
+        cx.ref.dq[i] = - .25* k * cx.state.q[i];
+    }
+}
 
 static void ctrl_ws_left(void) {
     // set actuals
