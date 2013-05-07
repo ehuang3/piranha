@@ -1,0 +1,15 @@
+#!/bin/sh
+
+
+
+
+case "$1" in
+    start)
+        achd -d push calvin joystick
+        joyd-logitech-f310
+        ;;
+    *)
+        echo "Invalid command"
+        exit 1
+        ;;
+esac
