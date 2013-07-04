@@ -68,25 +68,32 @@ struct pir_msg {
     int64_t i;
 };
 
+#define JS_AXES 8
+
 typedef struct {
     ach_channel_t chan_js;
     ach_channel_t chan_ref_torso;
     ach_channel_t chan_ref_left;
     ach_channel_t chan_state_pir;
     ach_channel_t chan_ctrl;
-    struct sns_msg_joystick *jsmsg;
+    double dt;
+
     struct sns_msg_motor_ref *msg_ref;
     struct pir_msg msg_ctrl;
     struct pir_state state;
     struct {
         double  q[PIR_AXIS_CNT];
         double dq[PIR_AXIS_CNT];
+        double user[JS_AXES];
+        uint64_t user_button;
     } ref;
     struct timespec now;
     rfx_ctrl_t G;
     rfx_ctrl_ws_lin_k_t K;
     double q_min[PIR_AXIS_CNT];
     double q_max[PIR_AXIS_CNT];
+
+    double sint;
 } cx_t;
 
 cx_t cx;
@@ -96,7 +103,6 @@ cx_t cx;
 // 20 deg/s
 #define MAXVEL_FACTOR 20 * M_PI/180
 
-#define JS_AXES 8
 
 #define VALID_NS (1000000000 / 5)
 
@@ -110,6 +116,9 @@ static void ctrl_joint_left_shoulder(void);
 static void ctrl_joint_left_wrist(void);
 static void ctrl_ws_left(void);
 static void ctrl_zero(void);
+static void ctrl_sin(void);
+static void ctrl_step(void);
+
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
 
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
@@ -118,13 +127,14 @@ int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
     memcpy( cx.state.Tee, tf_ident, 12*sizeof(cx.state.Tee[0]) );
     memcpy( cx.state.T0, tf_ident, 12*sizeof(cx.state.T0[0]) );
+    cx.dt = .005;
 
     /*-- args --*/
     for( int c; -1 != (c = getopt(argc, argv, "V?hH" SNS_OPTSTRING)); ) {
         switch(c) {
             SNS_OPTCASES;
         default:
-            sns_die( 0, "Invalid argument: %s\n", optarg );
+            SNS_DIE( "Invalid argument: %s\n", optarg );
         }
     }
 
@@ -136,10 +146,13 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_ref_torso,   "ref-torso",   NULL );
     sns_chan_open( &cx.chan_ref_left,    "ref-left",    NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",   NULL );
+    {
+        ach_channel_t *chans[] = {&cx.chan_state_pir, &cx.chan_js, NULL};
+        sns_sigcancel( chans, sns_sig_term_default );
+    }
 
     // alloc messages
     cx.msg_ref = sns_msg_motor_ref_alloc( PIR_MAX_MSG_AXES );
-    cx.jsmsg = sns_msg_joystick_alloc( JS_AXES );
     cx.msg_ref->mode = SNS_MOTOR_MODE_VEL;
 
     // setup reflex controller
@@ -160,7 +173,7 @@ int main( int argc, char **argv ) {
         cx.G.x_min[i] = -10;
         cx.G.x_max[i] = 10;
     }
-    aa_fset( cx.K.q, 0.1, 7 );
+    aa_fset( cx.K.q, 0.3, 7 );
     aa_fset( cx.K.f, 0, 6 );
     aa_fset( cx.K.p, 0.5, 3 );
     aa_fset( cx.K.p+3, 0.5, 3 );
@@ -179,16 +192,15 @@ int main( int argc, char **argv ) {
         //if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
             //SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
 
-        if( SNS_LOG_PRIORITY( LOG_DEBUG + 1 ) ) {
-            sns_msg_joystick_dump( stderr, cx.jsmsg );
-        }
-
         // control
         control();
 
-        cx.now = sns_time_add_ns(cx.now, 1000*1000*10 );
+        cx.now = sns_time_add_ns(cx.now, (int64_t)(cx.dt*1e9) );
         clock_nanosleep( ACH_DEFAULT_CLOCK, TIMER_ABSTIME,
                          &cx.now, NULL );
+
+        aa_mem_region_local_release();
+
     }
 
     sns_end();
@@ -200,47 +212,56 @@ static void update(void) {
     // state
     {
         size_t frame_size;
-        //struct timespec timeout = sns_time_add_ns( cx.now, 1000*1000*10 );
         ach_status_t r = ach_get( &cx.chan_state_pir, &cx.state, sizeof(cx.state), &frame_size,
                                   NULL, ACH_O_LAST );
-        SNS_REQUIRE( ( (ACH_OK == r || ACH_MISSED_FRAME == r) && frame_size == sizeof(cx.state) ) ||
-                     ACH_TIMEOUT == r ||
-                     ACH_STALE_FRAMES == r,
-                     "Failed to get frame: %s\n", ach_result_to_string(r) );
+        switch(r) {
+        case ACH_OK:
+        case ACH_MISSED_FRAME:
+        case ACH_CANCELED:
+        case ACH_TIMEOUT:
+        case ACH_STALE_FRAMES:
+            break;
+        default:
+            SNS_LOG(LOG_ERR, "Failed to get frame: %s\n", ach_result_to_string(r) );
+        }
     }
 
 
     // joystick
     {
         size_t frame_size;
-        size_t max_size = sns_msg_joystick_size_n( JS_AXES );
-        // get joystick
-        ach_status_t r = ach_get( &cx.chan_js, cx.jsmsg, max_size, &frame_size,
-                                  NULL,  ACH_O_LAST );
-
-        SNS_REQUIRE( ( ACH_OK == r || ACH_MISSED_FRAME == r || ACH_STALE_FRAMES == r ),
-                     "Failed to get frame: %s\n", ach_result_to_string(r) );
+        struct sns_msg_joystick *msg = NULL;
+        ach_status_t r = sns_msg_local_get( &cx.chan_js, (void**)&msg,
+                                            &frame_size,
+                                            NULL, ACH_O_LAST );
 
         // validate
-        if( (ACH_TIMEOUT == r || ACH_STALE_FRAMES == r) ) {
-            ;// pass
-        } else if( (ACH_OK == r || ACH_MISSED_FRAME == r) &&
-                   (cx.jsmsg->n != JS_AXES ||
-                    frame_size != sns_msg_joystick_size(cx.jsmsg) ) )
-        {
-            printf("bad js\n");
-            memset( cx.jsmsg->axis, 0, sizeof(cx.jsmsg->axis[0])*JS_AXES );
-            cx.jsmsg->buttons = 0;
-        } else {
-            if( cx.jsmsg->buttons & GAMEPAD_BUTTON_BACK ) {
-                if( strcmp(cx.msg_ctrl.mode, "halt") ) {
-                    printf("HALT\n");
+        switch(r) {
+        case ACH_OK:
+        case ACH_MISSED_FRAME:
+            if( msg->n == JS_AXES &&
+                frame_size == sns_msg_joystick_size(msg) )
+            {
+                if( msg->buttons & GAMEPAD_BUTTON_BACK ) {
+                    if( strcmp(cx.msg_ctrl.mode, "halt") ) {
+                        printf("HALT\n");
+                    }
+                    strcpy( cx.msg_ctrl.mode, "halt" );
+                    memset(cx.ref.user, 0, sizeof(cx.ref.user[0])*JS_AXES);
+                } else {
+                    memcpy(cx.ref.user, msg->axis, sizeof(cx.ref.user[0])*msg->n);
+                    cx.ref.user_button = msg->buttons;
                 }
-                strcpy( cx.msg_ctrl.mode, "halt" );
             }
+        break;
+        case ACH_STALE_FRAMES:
+        case ACH_TIMEOUT:
+        case ACH_CANCELED:
+            break;
+        default:
+            SNS_LOG(LOG_ERR, "Error getting joystick message\n");
         }
     }
-
 
     //mode
     set_mode();
@@ -261,6 +282,9 @@ static void set_mode(void) {
             aa_tf_rotmat2quat( cx.state.T, cx.G.r_r );
 
         }
+        if( 0 == strcmp("sin", cx.msg_ctrl.mode ) ) {
+            cx.sint=0;
+        }
     }
 }
 
@@ -275,6 +299,8 @@ static void control(void) {
         {"teleop-left-wrist", ctrl_joint_left_wrist},
         {"ws-left", ctrl_ws_left},
         {"zero", ctrl_zero},
+        {"sin", ctrl_sin},
+        {"step", ctrl_step},
         {NULL, NULL} };
 
     for( size_t i = 0; cmds[i].name != NULL; i ++ ) {
@@ -302,41 +328,42 @@ static void control_n( uint32_t n, size_t i, ach_channel_t *chan ) {
 
 
 static void ctrl_joint_torso(void) {
-    double u = cx.jsmsg->axis[GAMEPAD_AXIS_RT] - cx.jsmsg->axis[GAMEPAD_AXIS_LT];
+    double u = cx.ref.user[GAMEPAD_AXIS_RT] - cx.ref.user[GAMEPAD_AXIS_LT];
     cx.ref.dq[PIR_AXIS_T] = u * MAXVEL_FACTOR;
 }
 static void ctrl_joint_left_shoulder(void) {
     ctrl_joint_torso();
-    cx.ref.dq[PIR_AXIS_L0] = cx.jsmsg->axis[GAMEPAD_AXIS_LY] * MAXVEL_FACTOR;
-    cx.ref.dq[PIR_AXIS_L1] = cx.jsmsg->axis[GAMEPAD_AXIS_LX] * MAXVEL_FACTOR;
-    cx.ref.dq[PIR_AXIS_L2] = cx.jsmsg->axis[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
-    cx.ref.dq[PIR_AXIS_L3] = cx.jsmsg->axis[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L0] = cx.ref.user[GAMEPAD_AXIS_LY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L1] = cx.ref.user[GAMEPAD_AXIS_LX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L2] = cx.ref.user[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L3] = cx.ref.user[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
 }
 static void ctrl_joint_left_wrist(void) {
     ctrl_joint_torso();
-    cx.ref.dq[PIR_AXIS_L3] = cx.jsmsg->axis[GAMEPAD_AXIS_LX] * MAXVEL_FACTOR;
-    cx.ref.dq[PIR_AXIS_L4] = cx.jsmsg->axis[GAMEPAD_AXIS_LY] * MAXVEL_FACTOR;
-    cx.ref.dq[PIR_AXIS_L5] = cx.jsmsg->axis[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
-    cx.ref.dq[PIR_AXIS_L6] = cx.jsmsg->axis[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L3] = cx.ref.user[GAMEPAD_AXIS_LX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L4] = cx.ref.user[GAMEPAD_AXIS_LY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L5] = cx.ref.user[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_L6] = cx.ref.user[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
 }
 
 
 static void ctrl_zero(void) {
     for( size_t i = PIR_AXIS_L0; i <= PIR_AXIS_L6; i ++ ) {
-        double k = -cx.jsmsg->axis[GAMEPAD_AXIS_LT] + cx.jsmsg->axis[GAMEPAD_AXIS_RT];
+        double k = -cx.ref.user[GAMEPAD_AXIS_LT] + cx.ref.user[GAMEPAD_AXIS_RT];
         cx.ref.dq[i] = - .25* k * cx.state.q[i];
     }
 }
 
 static void ctrl_ws_left(void) {
-    // set actuals
+    // set actual FK
     memcpy( cx.G.x, &cx.state.T[9], sizeof(cx.G.x[0]) * 3 );
     aa_tf_rotmat2quat( cx.state.T, cx.G.r );
 
     // set refs
-    cx.G.dx_r[0] = cx.jsmsg->axis[GAMEPAD_AXIS_LX] * .05;
-    cx.G.dx_r[1] = cx.jsmsg->axis[GAMEPAD_AXIS_LY] * .05;
-    cx.G.dx_r[2] = cx.jsmsg->axis[GAMEPAD_AXIS_RX] * .05;
+    cx.G.dx_r[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .05;
+    cx.G.dx_r[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .05;
+    cx.G.dx_r[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .05;
+
 
     // compute stuff
     int r = rfx_ctrl_ws_lin_vfwd( &cx.G,
@@ -348,12 +375,41 @@ static void ctrl_ws_left(void) {
     }
 
     // integrate
-    /* double xr[3]; */
-    /* aa_tf_quat2rotvec( cx->X.arm[KRANG_I_LEFT].G.r_r, xr ); */
-    /* aa_la_axpy(3, dt, cx->X.arm[KRANG_I_LEFT].G.dx_r, */
-    /*            cx->X.arm[KRANG_I_LEFT].G.x_r ); */
-    /* aa_la_axpy(3, dt, cx->X.arm[KRANG_I_LEFT].G.dx_r + 3, */
-    /*            xr ); */
-    /* aa_tf_rotvec2quat( xr, cx->X.arm[KRANG_I_LEFT].G.r_r ); */
+    double xr[3];
+    aa_tf_quat2rotvec( cx.G.r_r, xr );
+    aa_la_axpy(3, cx.dt, cx.G.dx_r, cx.G.x_r );
+    aa_la_axpy(3, cx.dt, cx.G.dx_r + 3, xr );
+    aa_tf_rotvec2quat( xr, cx.G.r_r );
+
+}
+
+static void ctrl_sin(void) {
+
+    double k = (cx.ref.user[GAMEPAD_AXIS_LT] + cx.ref.user[GAMEPAD_AXIS_RT]) ;
+
+    double v = k*sin(cx.sint);
+
+    //printf("%f\n", v*180/M_PI);
+
+    cx.ref.dq[PIR_AXIS_L6] = v;
+    cx.ref.dq[PIR_AXIS_L5] = v;
+    cx.ref.dq[PIR_AXIS_L4] = v;
+    cx.ref.dq[PIR_AXIS_L3] = v;
+    cx.ref.dq[PIR_AXIS_L2] = v;
+    cx.ref.dq[PIR_AXIS_L1] = v;
+    cx.ref.dq[PIR_AXIS_L0] = v;
+
+    cx.sint += .001 * 2*M_PI;
+
+}
+
+static void ctrl_step(void) {
+
+    if( cx.ref.user[ GAMEPAD_AXIS_LT ] > .5 ) {
+        aa_fset(& cx.ref.dq[PIR_AXIS_L0], 15 * M_PI/180, 7 );
+    } else if( cx.ref.user[ GAMEPAD_AXIS_RT ] > .5 ) {
+        aa_fset(& cx.ref.dq[PIR_AXIS_L0], -15 * M_PI/180, 7 );
+    }
+
 
 }
