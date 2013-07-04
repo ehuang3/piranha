@@ -55,35 +55,18 @@
 
 
 
-enum pir_mode {
-    MODE_HALT = 0,
-    MODE_TORSO = 1,
-    MODE_L_SHOULDER = 2,
-    MODE_L_WRIST = 3,
-    MODE_R_SHOULDER = 4,
-    MODE_R_WRIST = 5,
-};
-
-struct pir_msg {
-    char mode[64];
-    int64_t i;
-};
-
 typedef struct {
     ach_channel_t chan_state_torso;
     ach_channel_t chan_state_left;
     ach_channel_t chan_state_pir;
-    struct sns_msg_motor_state *msg_state;
-
     struct pir_state state;
-
     struct timespec now;
 } cx_t;
 
 cx_t cx;
 
 static void update(void);
-static void update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts);
+static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts);
 
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
 
@@ -97,7 +80,7 @@ int main( int argc, char **argv ) {
         switch(c) {
             SNS_OPTCASES;
         default:
-            sns_die( 0, "Invalid argument: %s\n", optarg );
+            SNS_DIE( "Invalid argument: %s\n", optarg );
         }
     }
 
@@ -107,35 +90,53 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_state_torso, "state-torso", NULL );
     sns_chan_open( &cx.chan_state_left,  "state-left",  NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",  NULL );
-
-    // alloc messages
-    cx.msg_state = sns_msg_motor_state_alloc( PIR_MAX_MSG_AXES );
+    {
+        ach_channel_t *chans[] = {&cx.chan_state_left, &cx.chan_state_torso, NULL};
+        sns_sigcancel( chans, sns_sig_term_default );
+    }
 
     /* -- RUN -- */
     while (!sns_cx.shutdown) {
         update();
+        aa_mem_region_local_release();
     }
 
     sns_end();
     return 0;
 }
 
-static void update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts ) {
+static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts ) {
     size_t frame_size;
-    size_t expected = sns_msg_motor_state_size_n(n);
-    ach_status_t r = ach_get( chan, cx.msg_state,
-                              expected, &frame_size,
-                              ts, ACH_O_LAST | (ts ? ACH_O_WAIT : 0));
+    void *buf = NULL;
+    ach_status_t r = sns_msg_local_get( chan, &buf,
+                                        &frame_size,
+                                        ts, ACH_O_LAST | (ts ? ACH_O_WAIT : 0) );
+
+    struct sns_msg_motor_state *msg = (struct sns_msg_motor_state*)buf;
     // TODO: better validation
-    if( (ACH_OK == r || ACH_MISSED_FRAME == r) &&
-        n == cx.msg_state->n &&
-        frame_size == expected )
+    if( ACH_OK == r || ACH_MISSED_FRAME == r )
     {
-        for( size_t j = 0; j < n; j++ ) {
-            cx.state.q[i+j] =  cx.msg_state->X[j].pos;
-            cx.state.dq[i+j] = cx.msg_state->X[j].vel;
+        if( n == msg->n &&
+            frame_size == sns_msg_motor_state_size_n(n) )
+        {
+            for( size_t j = 0; j < n; j++ ) {
+                if( fabs(cx.state.q[i+j] -  msg->X[j].pos) > 1*M_PI/180 ) {
+                    printf("delta %"PRIuPTR": %f -> %f (%f)\n",
+                           i+j,
+                           cx.state.q[i+j], msg->X[j].pos,
+                           cx.state.q[i+j] -  msg->X[j].pos);
+                }
+                cx.state.q[i+j] =  msg->X[j].pos;
+                cx.state.dq[i+j] = msg->X[j].vel;
+            }
+            return 1;
+        } else {
+            SNS_LOG(LOG_ERR, "Invalid message\n");
         }
+    } else if( !(ACH_TIMEOUT == r || ACH_STALE_FRAMES == r) ) {
+        SNS_LOG(LOG_ERR, "Failed ach_get: %s\n", ach_result_to_string(r) );
     }
+    return 0;
 }
 
 static void update(void) {
@@ -143,21 +144,24 @@ static void update(void) {
     if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
         SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
 
-    struct timespec timeout = sns_time_add_ns( cx.now, 1000 * 1000 * 10 );
+    struct timespec timeout = sns_time_add_ns( cx.now, 1000 * 1000 * 1 );
 
     // axes
-    update_n(7, PIR_AXIS_L0, &cx.chan_state_left, &timeout);
-    update_n(1, PIR_AXIS_T,  &cx.chan_state_torso, NULL);
+    int is_updated = 0;
+    is_updated |= update_n(7, PIR_AXIS_L0, &cx.chan_state_left, &timeout);
+    //is_updated |= update_n(1, PIR_AXIS_T,  &cx.chan_state_torso, NULL);
 
     // compute
-    lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.state.T0, cx.state.Tee,
-               cx.state.T, cx.state.J );
+    if( is_updated ) {
+        lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.state.T0, cx.state.Tee,
+                   cx.state.T, cx.state.J );
 
-    // send
-    ach_status_t r = ach_put( &cx.chan_state_pir, &cx.state,
-                              sizeof(cx.state) );
+        // send
+        ach_status_t r = ach_put( &cx.chan_state_pir, &cx.state,
+                                  sizeof(cx.state) );
 
-    if( ACH_OK != r ) {
-        SNS_LOG( LOG_ERR, "Couldn't put ach frame: %s\n", ach_result_to_string(r) );
+        if( ACH_OK != r ) {
+            SNS_LOG( LOG_ERR, "Couldn't put ach frame: %s\n", ach_result_to_string(r) );
+        }
     }
 }
