@@ -127,7 +127,7 @@ int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
     memcpy( cx.state.Tee, tf_ident, 12*sizeof(cx.state.Tee[0]) );
     memcpy( cx.state.T0, tf_ident, 12*sizeof(cx.state.T0[0]) );
-    cx.dt = .005;
+    cx.dt = .002;
 
     /*-- args --*/
     for( int c; -1 != (c = getopt(argc, argv, "V?hH" SNS_OPTSTRING)); ) {
@@ -173,11 +173,12 @@ int main( int argc, char **argv ) {
         cx.G.x_min[i] = -10;
         cx.G.x_max[i] = 10;
     }
-    aa_fset( cx.K.q, 0.3, 7 );
+    aa_fset( cx.K.q, 0.001, 7 );
     aa_fset( cx.K.f, 0, 6 );
-    aa_fset( cx.K.p, 0.5, 3 );
-    aa_fset( cx.K.p+3, 0.5, 3 );
-    cx.K.dls = .000;
+    aa_fset( cx.K.p, 2.0, 3 );
+    aa_fset( cx.K.p+3, -4.0, 3 );
+    cx.K.p[5] *= -1;
+    cx.K.dls = .010;
 
 
     if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
