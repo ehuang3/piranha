@@ -81,8 +81,8 @@ T12 : tf_roty(-q(2))$
 T23 : tf_rotx(-q(3))$
 T34 : tf_tran(L_1,0,0) . tf_roty(-q(4))$
 T45 : tf_tran(L_2,0,0) . tf_rotx(-q(5))$
-T56 : tf_roty(-q(6))$
-T67 : tf_rotx(-q(7)) . tf_tran(L_e,0,0)$
+T56 : tf_roty(q(6))$
+T67 : tf_rotx(q(7)) . tf_tran(L_e,0,0)$
 
 TT : [T01, T12, T23, T34, T45, T56, T67]$
 TA : [
