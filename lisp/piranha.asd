@@ -42,7 +42,7 @@
 
 (asdf:defsystem piranha
   ;;:description "Basic utilities / numerics"
-  :depends-on ("cffi")
+  :depends-on ("cffi" "ach")
   :components ((:file "package")
                (cffi-grovel:grovel-file "grovel" :depends-on ("package"))
                (:file "piranha" :depends-on ("package" "grovel"))))

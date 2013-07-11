@@ -42,7 +42,7 @@
  * AUTHOR: Neil Dantam
  */
 
-load("/usr/share/amino/amino.mac");
+load("/home/ntd/local/share/amino/amino.mac");
 
 /*
  * Origin is at the shoulder point.

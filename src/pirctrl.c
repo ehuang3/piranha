@@ -175,10 +175,12 @@ int main( int argc, char **argv ) {
     }
     aa_fset( cx.K.q, 0.001, 7 );
     aa_fset( cx.K.f, 0, 6 );
-    aa_fset( cx.K.p, 2.0, 3 );
-    aa_fset( cx.K.p+3, -4.0, 3 );
-    cx.K.p[5] *= -1;
-    cx.K.dls = .010;
+    aa_fset( cx.K.p, 1.0, 3 );
+    //aa_fset( cx.K.p+3, -0.1, 3 );
+    cx.K.p[3] = .1;
+    cx.K.p[4] = .1;
+    cx.K.p[5] = .1;
+    cx.K.dls = .005;
 
 
     if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
@@ -279,7 +281,7 @@ static void set_mode(void) {
         printf("ctrl: %s %"PRId64"\n", cx.msg_ctrl.mode, cx.msg_ctrl.i);
 
         if( 0 == strcmp("ws-left", cx.msg_ctrl.mode ) ) {
-            memcpy( cx.G.x_r, &cx.state.T[9], sizeof(cx.G.x_r[0]) * 3 );
+            AA_MEM_CPY( cx.G.x_r, &cx.state.T[9],  3 );
             aa_tf_rotmat2quat( cx.state.T, cx.G.r_r );
 
         }
@@ -357,14 +359,26 @@ static void ctrl_zero(void) {
 
 static void ctrl_ws_left(void) {
     // set actual FK
-    memcpy( cx.G.x, &cx.state.T[9], sizeof(cx.G.x[0]) * 3 );
+    AA_MEM_CPY( cx.G.x, &cx.state.T[9], 3 );
     aa_tf_rotmat2quat( cx.state.T, cx.G.r );
 
-    // set refs
-    cx.G.dx_r[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .05;
-    cx.G.dx_r[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .05;
-    cx.G.dx_r[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .05;
+    AA_MEM_SET( cx.G.dx_r, 0, 6 );
 
+    // set refs
+    if( cx.ref.user_button & GAMEPAD_BUTTON_A ) {
+        cx.G.dx_r[3] = cx.ref.user[GAMEPAD_AXIS_LX] * .3;
+        cx.G.dx_r[4] = cx.ref.user[GAMEPAD_AXIS_LY] * .3;
+        cx.G.dx_r[5] = cx.ref.user[GAMEPAD_AXIS_RX] * .3;
+    } else {
+        cx.G.dx_r[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .1;
+        cx.G.dx_r[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .1;
+        cx.G.dx_r[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .1;
+    }
+
+
+    //cx.G.dx_r[3] = .5*(cx.ref.user[GAMEPAD_AXIS_RT] - cx.ref.user[GAMEPAD_AXIS_LT]);
+    //cx.G.dx_r[4] -= .5 * ve[1];
+    //cx.G.dx_r[5] -= -.5 * ve[2];
 
     // compute stuff
     int r = rfx_ctrl_ws_lin_vfwd( &cx.G,
@@ -376,9 +390,10 @@ static void ctrl_ws_left(void) {
     }
 
     // integrate
-    double xr[3];
-    aa_tf_quat2rotvec( cx.G.r_r, xr );
     aa_la_axpy(3, cx.dt, cx.G.dx_r, cx.G.x_r );
+    double xr[3];
+    double zero[3] = {0,0,0};
+    aa_tf_quat2rotvec_near( cx.G.r_r, zero, xr );
     aa_la_axpy(3, cx.dt, cx.G.dx_r + 3, xr );
     aa_tf_rotvec2quat( xr, cx.G.r_r );
 
