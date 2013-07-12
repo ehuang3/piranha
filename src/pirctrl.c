@@ -65,7 +65,10 @@ enum pir_mode {
 
 struct pir_msg {
     char mode[64];
-    int64_t i;
+    union {
+        int64_t i;
+        double f;
+    };
 };
 
 #define JS_AXES 8
@@ -174,13 +177,14 @@ int main( int argc, char **argv ) {
         cx.G.x_max[i] = 10;
     }
     aa_fset( cx.K.q, 0.001, 7 );
+    cx.K.q[6] *= 5; // this module is most sensitive to limits
     aa_fset( cx.K.f, 0, 6 );
-    aa_fset( cx.K.p, 1.0, 3 );
-    //aa_fset( cx.K.p+3, -0.1, 3 );
-    cx.K.p[3] = .1;
-    cx.K.p[4] = .1;
-    cx.K.p[5] = .1;
+    aa_fset( cx.K.p, 0.5, 3 );
+    aa_fset( cx.K.p+3, 0.5, 3 );
     cx.K.dls = .005;
+    cx.K.s2min = .01;
+    printf("dls s2min: %f\n", cx.K.s2min);
+    printf("dls k: %f\n", cx.K.dls);
 
 
     if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
@@ -274,19 +278,37 @@ static void update(void) {
 static void set_mode(void) {
     // poll mode
     size_t frame_size;
-    ach_status_t r = ach_get( &cx.chan_ctrl, &cx.msg_ctrl, sizeof(cx.msg_ctrl), &frame_size,
-                 NULL, ACH_O_LAST );
+    struct pir_msg *msg_ctrl;
+    ach_status_t r = sns_msg_local_get( &cx.chan_ctrl, (void**)&msg_ctrl,
+                                        &frame_size, NULL, ACH_O_LAST );
     if( ACH_OK == r || ACH_MISSED_FRAME == r ) {
-        cx.msg_ctrl.mode[63] = '\0';
-        printf("ctrl: %s %"PRId64"\n", cx.msg_ctrl.mode, cx.msg_ctrl.i);
+        msg_ctrl->mode[63] = '\0';
+        if( 0 == strcmp( "k_s2min", msg_ctrl->mode ) ) {
+            printf("k_s2min: %f\n", msg_ctrl->f );
+            cx.K.s2min = msg_ctrl->f;
+        } else if( 0 == strcmp( "k_pt", msg_ctrl->mode ) ) {
+            printf("k_pt: %f\n", msg_ctrl->f );
+            aa_fset( cx.K.p, msg_ctrl->f, 3 );
+        } else if( 0 == strcmp( "k_pr", msg_ctrl->mode ) ) {
+            printf("k_pr: %f\n", msg_ctrl->f );
+            aa_fset( cx.K.p+3, msg_ctrl->f, 3 );
+        } else if( 0 == strcmp( "k_q", msg_ctrl->mode ) ) {
+            printf("k_q: %f\n", msg_ctrl->f );
+            aa_fset( cx.K.q, msg_ctrl->f, 7 );
+        } else {
+            // actual mode setting
+            memcpy( &cx.msg_ctrl, msg_ctrl, sizeof(cx.msg_ctrl) );
+            cx.msg_ctrl.mode[63] = '\0';
+            printf("ctrl: %s %"PRId64"\n", cx.msg_ctrl.mode, cx.msg_ctrl.i);
 
-        if( 0 == strcmp("ws-left", cx.msg_ctrl.mode ) ) {
-            AA_MEM_CPY( cx.G.x_r, &cx.state.T[9],  3 );
-            aa_tf_rotmat2quat( cx.state.T, cx.G.r_r );
+            if( 0 == strcmp("ws-left", cx.msg_ctrl.mode ) ) {
+                AA_MEM_CPY( cx.G.x_r, &cx.state.T[9],  3 );
+                aa_tf_rotmat2quat( cx.state.T, cx.G.r_r );
 
-        }
-        if( 0 == strcmp("sin", cx.msg_ctrl.mode ) ) {
-            cx.sint=0;
+            }
+            if( 0 == strcmp("sin", cx.msg_ctrl.mode ) ) {
+                cx.sint=0;
+            }
         }
     }
 }
@@ -379,6 +401,9 @@ static void ctrl_ws_left(void) {
     //cx.G.dx_r[3] = .5*(cx.ref.user[GAMEPAD_AXIS_RT] - cx.ref.user[GAMEPAD_AXIS_LT]);
     //cx.G.dx_r[4] -= .5 * ve[1];
     //cx.G.dx_r[5] -= -.5 * ve[2];
+
+    //fprintf(stderr, "ref: ") ;aa_dump_vec(stderr, cx.G.r_r, 4 );
+    //fprintf(stderr, "actf: ") ;aa_dump_vec(stderr, cx.G.r, 4 );
 
     // compute stuff
     int r = rfx_ctrl_ws_lin_vfwd( &cx.G,

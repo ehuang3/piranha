@@ -74,6 +74,11 @@
 (defun pir-message (mode i)
   (with-foreign-object (msg 'pir-message)
     (pir-set-mode msg mode)
-    (setf (mem-aref (foreign-slot-pointer msg 'pir-message 'i) :int64)
-          i)
+    (etypecase i
+      (fixnum
+       (setf (mem-aref (foreign-slot-pointer msg 'pir-message 'i) :int64)
+             i))
+      (double-float
+       (setf (mem-aref (foreign-slot-pointer msg 'pir-message 'i) :double)
+             i)))
     (ach::put-pointer *ctrl-channel* msg (foreign-type-size 'pir-message))))
