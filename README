@@ -1,1 +1,13 @@
 Piranha
+
+Force/Torque Sensors
+====================
+* Uses nonstandard protocol (see ATI's docs)
+* Default NODE id is 0x20, conflicts with PDOs for low-numbered CANopen
+  nodes
+* Workaround: set node id to 0x27, so we only conflict with CANopen
+  nodes > 0x70
+
+# Local Variables:
+#   mode: markdown
+# End:
