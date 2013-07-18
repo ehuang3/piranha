@@ -1,20 +1,79 @@
 #!/bin/sh
+#
+# Copyright (c) 2013, Georgia Tech Research Corporation
+# All rights reserved.
+#
+# Author(s): Neil T. Dantam <ntd@gatech.edu>
+# Georgia Tech Humanoid Robotics Lab
+# Under Direction of Prof. Mike Stilman <mstilman@cc.gatech.edu>
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+#     * Redistributions of source code must retain the above
+#       copyright notice, this list of conditions and the following
+#       disclaimer.
+#     * Redistributions in binary form must reproduce the above
+#       copyright notice, this list of conditions and the following
+#       disclaimer in the documentation and/or other materials
+#       provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+# COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+# INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+# STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+# OF THE POSSIBILITY OF SUCH DAMAGE.
 
+if test -x ~/local/etc/init.d/sns; then
+    SNS=~/local/etc/init.d/sns
+elif test -x /usr/local/etc/init.d/sns; then
+    SNS=/usr/local/etc/init.d/sns
+elif test -x /etc/init.d/sns; then
+    SNS=/etc/init.d/sns
+else
+    echo "Could not find SNS program"
+    exit 1
+fi
 
+pir_ach_mk() {
+    ach  mk -1 -o 666 ref-torso
+    ach  mk -1 -o 666 state-torso
+    ach  mk -1 -o 666 ref-left
+    ach  mk -1 -o 666 state-left
+    ach  mk -1 -o 666 ref-right
+    ach  mk -1 -o 666 state-right
+    ach  mk -1 -o 666 joystick
+    ach  mk -1 -o 666 pir-ctrl
+    ach  mk -1 -o 666 pir-state
+}
 
+pir_start() {
+    pir_ach_mk
+    $SNS run -d -r lwa-left -- \
+        can402 -f can0 -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-left -s state-left
+    $SNS run -d -r lwa-right -- \
+        can402 -f can1 -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-right -s state-right
+}
+
+pir_stop() {
+    $SNS kill lwa-left
+    $SNS kill lwa-right
+}
 
 case "$1" in
     start)
-
-        for i in 0 1 2 3; do sudo ip link set can$i type can bitrate 500000; done
-
-        ach  mk -1 -o 666 ref-torso
-        ach  mk -1 -o 666 state-torso
-        ach  mk -1 -o 666 ref-left
-        ach  mk -1 -o 666 state-left
-        ach  mk -1 -o 666 joystick
-        ach  mk -1 -o 666 pir-ctrl
-        ach  mk -1 -o 666 pir-state
+        pir_start
+        ;;
+    stop)
+        pir_stop
         ;;
     *)
         echo "Invalid command"
