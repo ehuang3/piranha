@@ -58,6 +58,7 @@
 typedef struct {
     ach_channel_t chan_state_torso;
     ach_channel_t chan_state_left;
+    ach_channel_t chan_state_right;
     ach_channel_t chan_state_pir;
     struct pir_state state;
     struct timespec now;
@@ -89,6 +90,7 @@ int main( int argc, char **argv ) {
     // open channel
     sns_chan_open( &cx.chan_state_torso, "state-torso", NULL );
     sns_chan_open( &cx.chan_state_left,  "state-left",  NULL );
+    sns_chan_open( &cx.chan_state_right, "state-right", NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",  NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_left, &cx.chan_state_torso, NULL};
@@ -147,14 +149,17 @@ static void update(void) {
     struct timespec timeout = sns_time_add_ns( cx.now, 1000 * 1000 * 1 );
 
     // axes
-    int is_updated = 0;
-    is_updated |= update_n(7, PIR_AXIS_L0, &cx.chan_state_left, &timeout);
+    int u_l = update_n(7, PIR_AXIS_L0, &cx.chan_state_left, &timeout);
+    int u_r = update_n(7, PIR_AXIS_R0, &cx.chan_state_right, &timeout);
     //is_updated |= update_n(1, PIR_AXIS_T,  &cx.chan_state_torso, NULL);
 
+    if( u_l ) lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.state.T0, cx.state.Tee,
+                         cx.state.T_L, cx.state.J_L );
+    if( u_r ) lwa4_kin_( &cx.state.q[PIR_AXIS_R0], cx.state.T0, cx.state.Tee,
+                         cx.state.T_R, cx.state.J_R );
     // compute
+    int is_updated = u_l || u_r;
     if( is_updated ) {
-        lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.state.T0, cx.state.Tee,
-                   cx.state.T, cx.state.J );
 
         // send
         ach_status_t r = ach_put( &cx.chan_state_pir, &cx.state,

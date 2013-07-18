@@ -77,6 +77,7 @@ typedef struct {
     ach_channel_t chan_js;
     ach_channel_t chan_ref_torso;
     ach_channel_t chan_ref_left;
+    ach_channel_t chan_ref_right;
     ach_channel_t chan_state_pir;
     ach_channel_t chan_ctrl;
     double dt;
@@ -91,7 +92,8 @@ typedef struct {
         uint64_t user_button;
     } ref;
     struct timespec now;
-    rfx_ctrl_t G;
+    rfx_ctrl_t G_L;
+    rfx_ctrl_t G_R;
     rfx_ctrl_ws_lin_k_t K;
     double q_min[PIR_AXIS_CNT];
     double q_max[PIR_AXIS_CNT];
@@ -117,7 +119,10 @@ static void control(void);
 typedef void (*ctrl_fun_t)(void);
 static void ctrl_joint_left_shoulder(void);
 static void ctrl_joint_left_wrist(void);
+static void ctrl_joint_right_shoulder(void);
+static void ctrl_joint_right_wrist(void);
 static void ctrl_ws_left(void);
+static void ctrl_ws_right(void);
 static void ctrl_zero(void);
 static void ctrl_sin(void);
 static void ctrl_step(void);
@@ -148,6 +153,7 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_ctrl,        "pir-ctrl",    NULL );
     sns_chan_open( &cx.chan_ref_torso,   "ref-torso",   NULL );
     sns_chan_open( &cx.chan_ref_left,    "ref-left",    NULL );
+    sns_chan_open( &cx.chan_ref_right,   "ref-right",   NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",   NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_pir, &cx.chan_js, NULL};
@@ -159,23 +165,38 @@ int main( int argc, char **argv ) {
     cx.msg_ref->mode = SNS_MOTOR_MODE_VEL;
 
     // setup reflex controller
-    rfx_ctrl_ws_lin_k_init( &cx.K, 7 );
-    cx.G.n_q = 7;
-    cx.G.J =  cx.state.J;
-    cx.G.q =  &cx.state.q[PIR_AXIS_L0];
-    cx.G.dq = &cx.state.dq[PIR_AXIS_L0];
-    cx.G.q_r =  &cx.ref.q[PIR_AXIS_L0];
-    cx.G.dq_r = &cx.ref.dq[PIR_AXIS_L0];
-    cx.G.q_min = &cx.q_min[PIR_AXIS_L0];
-    cx.G.q_max = &cx.q_max[PIR_AXIS_L0];
     for( size_t i = 0; i < PIR_AXIS_CNT; i ++ ) {
         cx.q_min[i] = -2*M_PI;
         cx.q_max[i] = M_PI;
     }
+    // left
+    cx.G_L.n_q = 7;
+    cx.G_L.J =  cx.state.J_L;
+    cx.G_L.q =  &cx.state.q[PIR_AXIS_L0];
+    cx.G_L.dq = &cx.state.dq[PIR_AXIS_L0];
+    cx.G_L.q_r =  &cx.ref.q[PIR_AXIS_L0];
+    cx.G_L.dq_r = &cx.ref.dq[PIR_AXIS_L0];
+    cx.G_L.q_min = &cx.q_min[PIR_AXIS_L0];
+    cx.G_L.q_max = &cx.q_max[PIR_AXIS_L0];
     for( size_t i = 0; i < 3; i ++ ) {
-        cx.G.x_min[i] = -10;
-        cx.G.x_max[i] = 10;
+        cx.G_L.x_min[i] = -10;
+        cx.G_L.x_max[i] = 10;
     }
+    // right
+    cx.G_R.n_q = 7;
+    cx.G_R.J =  cx.state.J_R;
+    cx.G_R.q =  &cx.state.q[PIR_AXIS_R0];
+    cx.G_R.dq = &cx.state.dq[PIR_AXIS_R0];
+    cx.G_R.q_r =  &cx.ref.q[PIR_AXIS_R0];
+    cx.G_R.dq_r = &cx.ref.dq[PIR_AXIS_R0];
+    cx.G_R.q_min = &cx.q_min[PIR_AXIS_R0];
+    cx.G_R.q_max = &cx.q_max[PIR_AXIS_R0];
+    for( size_t i = 0; i < 3; i ++ ) {
+        cx.G_R.x_min[i] = -10;
+        cx.G_R.x_max[i] = 10;
+    }
+
+    rfx_ctrl_ws_lin_k_init( &cx.K, 7 );
     aa_fset( cx.K.q, 0.001, 7 );
     cx.K.q[6] *= 5; // this module is most sensitive to limits
     aa_fset( cx.K.f, 0, 6 );
@@ -302,9 +323,12 @@ static void set_mode(void) {
             printf("ctrl: %s %"PRId64"\n", cx.msg_ctrl.mode, cx.msg_ctrl.i);
 
             if( 0 == strcmp("ws-left", cx.msg_ctrl.mode ) ) {
-                AA_MEM_CPY( cx.G.x_r, &cx.state.T[9],  3 );
-                aa_tf_rotmat2quat( cx.state.T, cx.G.r_r );
-
+                AA_MEM_CPY( cx.G_L.x_r, &cx.state.T_L[9],  3 );
+                aa_tf_rotmat2quat( cx.state.T_L, cx.G_L.r_r );
+            }
+            if( 0 == strcmp("ws-right", cx.msg_ctrl.mode ) ) {
+                AA_MEM_CPY( cx.G_R.x_r, &cx.state.T_R[9],  3 );
+                aa_tf_rotmat2quat( cx.state.T_R, cx.G_R.r_r );
             }
             if( 0 == strcmp("sin", cx.msg_ctrl.mode ) ) {
                 cx.sint=0;
@@ -320,9 +344,12 @@ static void control(void) {
         const char *name;
         ctrl_fun_t fun;
     } cmds[] = {
-        {"teleop-left-shoulder", ctrl_joint_left_shoulder},
-        {"teleop-left-wrist", ctrl_joint_left_wrist},
+        {"left-shoulder", ctrl_joint_left_shoulder},
+        {"left-wrist", ctrl_joint_left_wrist},
+        {"right-shoulder", ctrl_joint_right_shoulder},
+        {"right-wrist", ctrl_joint_right_wrist},
         {"ws-left", ctrl_ws_left},
+        {"ws-right", ctrl_ws_right},
         {"zero", ctrl_zero},
         {"sin", ctrl_sin},
         {"step", ctrl_step},
@@ -340,6 +367,8 @@ static void control(void) {
     control_n( 1, PIR_AXIS_T, &cx.chan_ref_torso );
     // left
     control_n( 7, PIR_AXIS_L0, &cx.chan_ref_left );
+    // right
+    control_n( 7, PIR_AXIS_R0, &cx.chan_ref_right );
 }
 
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan ) {
@@ -370,6 +399,20 @@ static void ctrl_joint_left_wrist(void) {
     cx.ref.dq[PIR_AXIS_L5] = cx.ref.user[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
     cx.ref.dq[PIR_AXIS_L6] = cx.ref.user[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
 }
+static void ctrl_joint_right_shoulder(void) {
+    ctrl_joint_torso();
+    cx.ref.dq[PIR_AXIS_R0] = cx.ref.user[GAMEPAD_AXIS_LY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_R1] = cx.ref.user[GAMEPAD_AXIS_LX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_R2] = cx.ref.user[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_R3] = cx.ref.user[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
+}
+static void ctrl_joint_right_wrist(void) {
+    ctrl_joint_torso();
+    cx.ref.dq[PIR_AXIS_R3] = cx.ref.user[GAMEPAD_AXIS_LX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_R4] = cx.ref.user[GAMEPAD_AXIS_LY] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_R5] = cx.ref.user[GAMEPAD_AXIS_RX] * MAXVEL_FACTOR;
+    cx.ref.dq[PIR_AXIS_R6] = cx.ref.user[GAMEPAD_AXIS_RY] * MAXVEL_FACTOR;
+}
 
 
 static void ctrl_zero(void) {
@@ -377,51 +420,53 @@ static void ctrl_zero(void) {
         double k = -cx.ref.user[GAMEPAD_AXIS_LT] + cx.ref.user[GAMEPAD_AXIS_RT];
         cx.ref.dq[i] = - .25* k * cx.state.q[i];
     }
+    for( size_t i = PIR_AXIS_R0; i <= PIR_AXIS_R6; i ++ ) {
+        double k = -cx.ref.user[GAMEPAD_AXIS_LT] + cx.ref.user[GAMEPAD_AXIS_RT];
+        cx.ref.dq[i] = - .25* k * cx.state.q[i];
+    }
 }
 
-static void ctrl_ws_left(void) {
-    // set actual FK
-    AA_MEM_CPY( cx.G.x, &cx.state.T[9], 3 );
-    aa_tf_rotmat2quat( cx.state.T, cx.G.r );
 
-    AA_MEM_SET( cx.G.dx_r, 0, 6 );
+static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, double *T) {
+    // set actual FK
+    AA_MEM_CPY( G->x, T+9, 3 );
+    aa_tf_rotmat2quat( T, G->r );
 
     // set refs
+    AA_MEM_SET( G->dx_r, 0, 6 );
     if( cx.ref.user_button & GAMEPAD_BUTTON_A ) {
-        cx.G.dx_r[3] = cx.ref.user[GAMEPAD_AXIS_LX] * .3;
-        cx.G.dx_r[4] = cx.ref.user[GAMEPAD_AXIS_LY] * .3;
-        cx.G.dx_r[5] = cx.ref.user[GAMEPAD_AXIS_RX] * .3;
+        G->dx_r[3] = cx.ref.user[GAMEPAD_AXIS_LX] * .3;
+        G->dx_r[4] = cx.ref.user[GAMEPAD_AXIS_LY] * .3;
+        G->dx_r[5] = cx.ref.user[GAMEPAD_AXIS_RX] * .3;
     } else {
-        cx.G.dx_r[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .1;
-        cx.G.dx_r[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .1;
-        cx.G.dx_r[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .1;
+        G->dx_r[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .1;
+        G->dx_r[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .1;
+        G->dx_r[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .1;
     }
 
-
-    //cx.G.dx_r[3] = .5*(cx.ref.user[GAMEPAD_AXIS_RT] - cx.ref.user[GAMEPAD_AXIS_LT]);
-    //cx.G.dx_r[4] -= .5 * ve[1];
-    //cx.G.dx_r[5] -= -.5 * ve[2];
-
-    //fprintf(stderr, "ref: ") ;aa_dump_vec(stderr, cx.G.r_r, 4 );
-    //fprintf(stderr, "actf: ") ;aa_dump_vec(stderr, cx.G.r, 4 );
-
     // compute stuff
-    int r = rfx_ctrl_ws_lin_vfwd( &cx.G,
-                                  &cx.K,
-                                  &cx.ref.dq[PIR_AXIS_L0] );
+    int r = rfx_ctrl_ws_lin_vfwd( G, &cx.K, &cx.ref.dq[i] );
     if( RFX_OK != r ) {
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );
     }
 
     // integrate
-    aa_la_axpy(3, cx.dt, cx.G.dx_r, cx.G.x_r );
+    aa_la_axpy(3, cx.dt, G->dx_r, G->x_r );
     double xr[3];
     double zero[3] = {0,0,0};
-    aa_tf_quat2rotvec_near( cx.G.r_r, zero, xr );
-    aa_la_axpy(3, cx.dt, cx.G.dx_r + 3, xr );
-    aa_tf_rotvec2quat( xr, cx.G.r_r );
+    aa_tf_quat2rotvec_near( G->r_r, zero, xr );
+    aa_la_axpy(3, cx.dt, G->dx_r + 3, xr );
+    aa_tf_rotvec2quat( xr, G->r_r );
 
+}
+
+static void ctrl_ws_left(void) {
+    ctrl_ws( PIR_AXIS_L0, &cx.G_L, cx.state.T_L );
+}
+
+static void ctrl_ws_right(void) {
+    ctrl_ws( PIR_AXIS_R0, &cx.G_R, cx.state.T_R );
 }
 
 static void ctrl_sin(void) {
