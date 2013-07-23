@@ -64,9 +64,14 @@ enum pir_axis {
     PIR_AXIS_CNT = 15
 };
 
+// TODO: all transforms, jacobians, forces, in global frame
+
 struct pir_state {
     double q[PIR_AXIS_CNT];
     double dq[PIR_AXIS_CNT];
+
+    double F_L[6];
+    double F_R[6];
 
     double Tee[12];
     double T0[12];

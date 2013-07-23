@@ -3,14 +3,14 @@ AM_CPPFLAGS = -I$(top_srcdir)/include
 
 bin_PROGRAMS = pirctrl pirfilt
 
-noinst_PROGRAMS = check-can
+# noinst_PROGRAMS = check-can
 
 pirctrl_SOURCES = src/pirctrl.c
 pirctrl_LDADD = -lsns -lach  -lreflex -lamino -lblas -llapack
 
 
-check_can_SOURCES = src/check-can.c
-check_can_LDADD = -lsns  -lamino -lsocanmatic -lblas -llapack
+# check_can_SOURCES = src/check-can.c
+# check_can_LDADD = -lsns  -lamino -lsocanmatic -lblas -llapack
 
 pirfilt_SOURCES = src/pirfilt.c kinematics.f
 pirfilt_LDADD = -lsns -lach -lamino -lblas -llapack

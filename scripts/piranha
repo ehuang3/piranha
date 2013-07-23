@@ -53,19 +53,30 @@ pir_ach_mk() {
     ach  mk -1 -o 666 joystick
     ach  mk -1 -o 666 pir-ctrl
     ach  mk -1 -o 666 pir-state
+    ach  mk -1 -o 666 ft-left
+    ach  mk -1 -o 666 ft-right
 }
+
+CAN_L=can0
+CAN_R=can1
 
 pir_start() {
     pir_ach_mk
     $SNS run -d -r lwa-left -- \
-        can402 -f can0 -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-left -s state-left
+        can402 -f $CAN_L -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-left -s state-left
     $SNS run -d -r lwa-right -- \
-        can402 -f can1 -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-right -s state-right
+        can402 -f $CAN_R -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-right -s state-right
+    $SNS run -d -r ft-left -- \
+        cftd -f $CAN_L -n 27 -c ft-left
+    $SNS run -d -r ft-right -- \
+        cftd -f $CAN_R -n 27 -c ft-right
 }
 
 pir_stop() {
     $SNS kill lwa-left
     $SNS kill lwa-right
+    $SNS kill ft-left
+    $SNS kill ft-right
 }
 
 case "$1" in

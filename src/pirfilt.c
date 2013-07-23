@@ -59,7 +59,16 @@ typedef struct {
     ach_channel_t chan_state_torso;
     ach_channel_t chan_state_left;
     ach_channel_t chan_state_right;
+    ach_channel_t chan_ft_left;
+    ach_channel_t chan_ft_right;
     ach_channel_t chan_state_pir;
+
+
+    double F_raw_L[6]; ///< raw F/T reading, left
+    double F_raw_R[6]; ///< raw F/T reading, right
+
+    double R_ft[9];    ///< Rotation from E.E. to F/T
+
     struct pir_state state;
     struct timespec now;
 } cx_t;
@@ -91,10 +100,28 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_state_torso, "state-torso", NULL );
     sns_chan_open( &cx.chan_state_left,  "state-left",  NULL );
     sns_chan_open( &cx.chan_state_right, "state-right", NULL );
+    sns_chan_open( &cx.chan_ft_left,  "ft-left",  NULL );
+    sns_chan_open( &cx.chan_ft_right, "ft-right", NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",  NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_left, &cx.chan_state_torso, NULL};
         sns_sigcancel( chans, sns_sig_term_default );
+    }
+
+    /*-- Init constants --*/
+    {
+        // F/T rotation
+        double R0[9] = { 0, 1, 0,
+                         0, 0, 1,
+                         1, 0, 0 };
+        assert(aa_tf_isrotmat(R0));
+
+        double Rrot[9];
+        aa_tf_zangle2rotmat(15*M_PI/180, Rrot);
+        aa_tf_9mul( R0, Rrot, cx.R_ft );
+
+        //AA_MEM_CPY( cx.R_ft, R0, 9 );
+
     }
 
     /* -- RUN -- */
@@ -114,10 +141,12 @@ static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts
                                         &frame_size,
                                         ts, ACH_O_LAST | (ts ? ACH_O_WAIT : 0) );
 
-    struct sns_msg_motor_state *msg = (struct sns_msg_motor_state*)buf;
-    // TODO: better validation
-    if( ACH_OK == r || ACH_MISSED_FRAME == r )
+    switch(r) {
+    case ACH_OK:
+    case ACH_MISSED_FRAME:
     {
+        struct sns_msg_motor_state *msg = (struct sns_msg_motor_state*)buf;
+        // TODO: better validation
         if( n == msg->n &&
             frame_size == sns_msg_motor_state_size_n(n) )
         {
@@ -133,12 +162,65 @@ static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts
             }
             return 1;
         } else {
-            SNS_LOG(LOG_ERR, "Invalid message\n");
+            SNS_LOG(LOG_ERR, "Invalid motor_state message\n");
         }
-    } else if( !(ACH_TIMEOUT == r || ACH_STALE_FRAMES == r) ) {
+        break;
+    }
+    case ACH_TIMEOUT:
+    case ACH_STALE_FRAMES:
+        break;
+    default:
         SNS_LOG(LOG_ERR, "Failed ach_get: %s\n", ach_result_to_string(r) );
     }
     return 0;
+}
+
+static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
+    size_t frame_size;
+    void *buf = NULL;
+    ach_status_t r = sns_msg_local_get( chan, &buf,
+                                        &frame_size,
+                                        ts, ACH_O_LAST | (ts ? ACH_O_WAIT : 0) );
+    switch(r) {
+    case ACH_OK:
+    case ACH_MISSED_FRAME:
+    {
+        struct sns_msg_vector *msg = (struct sns_msg_vector*)buf;
+        // TODO: better validation
+        if( 6 == msg->n &&
+            frame_size == sns_msg_vector_size_n(6) )
+        {
+            for( size_t i = 0; i < 6; i++ ) {
+                F[i] = msg->x[i];
+            }
+            return 1;
+        } else {
+            SNS_LOG(LOG_ERR, "Invalid F/T message\n");
+        }
+        break;
+    }
+    case ACH_TIMEOUT:
+    case ACH_STALE_FRAMES:
+        break;
+    default:
+        SNS_LOG(LOG_ERR, "Failed ach_get: %s\n", ach_result_to_string(r) );
+    }
+    return 0;
+}
+
+static void rotate_ft( const double *R_arm, const double *F_raw, double *F ) {
+    double F_tmp[6];
+    aa_tf_9rot( cx.R_ft, F_raw,   F_tmp );
+    aa_tf_9rot( cx.R_ft, F_raw+3, F_tmp+3 );
+
+    //aa_dump_vec( stdout, F_tmp, 3 );
+    /* printf("%f\t%f\t%f\t|\t%f\t%f\t%f\n", */
+    /*         F_raw[0], F_raw[1], F_raw[2], */
+    /*         F_tmp[0], F_tmp[1], F_tmp[2] ); */
+
+
+    aa_tf_9rot( R_arm, F_tmp,   F );
+    aa_tf_9rot( R_arm, F_tmp+3, F+3 );
 }
 
 static void update(void) {
@@ -147,18 +229,29 @@ static void update(void) {
         SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
 
     struct timespec timeout = sns_time_add_ns( cx.now, 1000 * 1000 * 1 );
+    int is_updated = 0;
 
     // axes
     int u_l = update_n(7, PIR_AXIS_L0, &cx.chan_state_left, &timeout);
     int u_r = update_n(7, PIR_AXIS_R0, &cx.chan_state_right, &timeout);
-    //is_updated |= update_n(1, PIR_AXIS_T,  &cx.chan_state_torso, NULL);
+    is_updated = is_updated || u_l || u_r;
 
+    // force-torque
+    int u_fl = update_ft( cx.F_raw_L, &cx.chan_ft_left, &timeout );
+    int u_fr = update_ft( cx.F_raw_R, &cx.chan_ft_right, &timeout );
+
+    // update kinematics
     if( u_l ) lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.state.T0, cx.state.Tee,
                          cx.state.T_L, cx.state.J_L );
     if( u_r ) lwa4_kin_( &cx.state.q[PIR_AXIS_R0], cx.state.T0, cx.state.Tee,
                          cx.state.T_R, cx.state.J_R );
+
+    if( u_l || u_fl ) rotate_ft( cx.state.T_L, cx.F_raw_L, cx.state.F_L );
+    if( u_r || u_fr ) rotate_ft( cx.state.T_R, cx.F_raw_R, cx.state.F_R );
+
+    //if( u_l || u_fl ) aa_dump_vec( stdout, cx.state.F_L, 3 );
+
     // compute
-    int is_updated = u_l || u_r;
     if( is_updated ) {
 
         // send

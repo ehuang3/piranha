@@ -197,9 +197,9 @@ int main( int argc, char **argv ) {
     }
 
     rfx_ctrl_ws_lin_k_init( &cx.K, 7 );
-    aa_fset( cx.K.q, 0.001, 7 );
+    aa_fset( cx.K.q, 0.1, 7 );
     cx.K.q[6] *= 5; // this module is most sensitive to limits
-    aa_fset( cx.K.f, 0, 6 );
+    aa_fset( cx.K.f, -.002, 6 );
     aa_fset( cx.K.p, 0.5, 3 );
     aa_fset( cx.K.p+3, 0.5, 3 );
     cx.K.dls = .005;
@@ -427,10 +427,11 @@ static void ctrl_zero(void) {
 }
 
 
-static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, double *T) {
+static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, const double *T, const double *F) {
     // set actual FK
     AA_MEM_CPY( G->x, T+9, 3 );
     aa_tf_rotmat2quat( T, G->r );
+    AA_MEM_CPY( G->F, F, 6 );
 
     // set refs
     AA_MEM_SET( G->dx_r, 0, 6 );
@@ -462,11 +463,11 @@ static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, double *T) {
 }
 
 static void ctrl_ws_left(void) {
-    ctrl_ws( PIR_AXIS_L0, &cx.G_L, cx.state.T_L );
+    ctrl_ws( PIR_AXIS_L0, &cx.G_L, cx.state.T_L, cx.state.F_L );
 }
 
 static void ctrl_ws_right(void) {
-    ctrl_ws( PIR_AXIS_R0, &cx.G_R, cx.state.T_R );
+    ctrl_ws( PIR_AXIS_R0, &cx.G_R, cx.state.T_R, cx.state.F_R );
 }
 
 static void ctrl_sin(void) {
