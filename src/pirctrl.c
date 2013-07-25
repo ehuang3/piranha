@@ -451,20 +451,8 @@ static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, const double *T, const double *F
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );
     }
-
     // integrate
-    aa_la_axpy(3, cx.dt, G->dx_r, G->x_r );
-
-    /* double xr[3]; */
-    /* //double zero[3] = {0,0,0}; */
-    /* //aa_tf_quat2rotvec_near( G->r_r, zero, xr ); */
-    /* aa_tf_quat2rotvec( G->r_r, xr ); */
-    /* aa_la_axpy(3, cx.dt, G->dx_r + 3, xr ); */
-    /* aa_tf_rotvec2quat( xr, G->r_r ); */
-    double r1[4];
-    aa_tf_qvelrk4( G->r_r, G->dx_r+3, cx.dt, r1 );
-    AA_MEM_CPY( G->r_r, r1, 4 );
-
+    rfx_ctrl_ws_sdx( G, cx.dt );
 }
 
 static void ctrl_ws_left(void) {
