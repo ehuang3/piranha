@@ -42,6 +42,7 @@
  * AUTHOR: Neil Dantam
  */
 
+load(f90);
 load("/home/ntd/local/share/amino/amino.mac");
 
 /*
@@ -100,6 +101,9 @@ tf_e : last(TP) . TFee$
 
 J : spatial_jacobian( TT, TA, TFee)$
 
+tf_e : (tf_e)$
+J : (J)$
+
 with_stdout("kinematics.f",
   /* FK & Jacobian */
   print("      Subroutine lwa4_kin (q, T0, Tee, T, J)"),
@@ -115,3 +119,30 @@ with_stdout("kinematics.f",
   print("      End")
 
 );
+
+
+TT_rel : [tf_rotx(-q(1)), T12, T23, T34, T45, T56, T67]$
+
+with_stdout("tf.f",
+  print("      Subroutine lwa4_tf (q, TTr )"),
+  print("      Double Precision q(7)"),
+  print("      Double Precision TTr(3,4,7)"),
+  for k : 1 thru 7 do
+  for j : 1 thru 4 do
+  for i : 1 thru 3 do
+  fortran( TTr(i,j,k) = TT_rel[k][i][j] ),
+  print("      Return"),
+  print("      End")
+
+  /* print("      Subroutine lwa4_tf_abs (q, T0, TTa )"), */
+  /* print("      Double Precision q(7)"), */
+  /* print("      Double Precision TTa(3,4,7)"), */
+  /* print("      Double Precision T0(3,4)"), */
+  /* for k : 1 thru 7 do */
+  /* for j : 1 thru 4 do */
+  /* for i : 1 thru 3 do */
+  /* fortran( TTa(i,j,k) = TP[k][i][j] ), */
+  /* print("      Return"), */
+  /* print("      End") */
+
+  );

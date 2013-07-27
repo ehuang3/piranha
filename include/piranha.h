@@ -43,6 +43,9 @@
 #ifndef PIRANHA_H
 #define PIRANHA_H
 
+#include <amino.h>
+#include <reflex.h>
+
 #define PIR_MAX_MSG_AXES 7
 
 enum pir_axis {
@@ -82,5 +85,9 @@ struct pir_state {
 };
 
 void lwa4_kin_( const double *q, const double *T0, const double *Tee, double *T, double *J );
+void lwa4_tf_( const double *q, double *TT );
+void lwa4_tf_abs_( const double *q, const double *T0, double *TT );
 
+
+void lwa4_kin2_( const double *q, const double *T0, const double *Tee, double *T, double *J );
 #endif //PIRANHA_H
