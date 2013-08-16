@@ -91,16 +91,6 @@ void lwa4_tf_abs_( const double *q, const double *T0, double *TT );
 
 void lwa4_kin2_( const double *q, const double *T0, const double *Tee, double *T, double *J );
 
-
-enum pir_mode {
-    MODE_HALT = 0,
-    MODE_TORSO = 1,
-    MODE_L_SHOULDER = 2,
-    MODE_L_WRIST = 3,
-    MODE_R_SHOULDER = 4,
-    MODE_R_WRIST = 5,
-};
-
 struct pir_msg {
     char mode[64];
     uint64_t n;
@@ -109,5 +99,59 @@ struct pir_msg {
         double f;
     } x [1];
 };
+
+
+struct pir_mode_desc;
+
+#define JS_AXES 8
+typedef struct {
+    ach_channel_t chan_js;
+    ach_channel_t chan_ref_torso;
+    ach_channel_t chan_ref_left;
+    ach_channel_t chan_ref_right;
+    ach_channel_t chan_state_pir;
+    ach_channel_t chan_ctrl;
+    double dt;
+
+    struct sns_msg_motor_ref *msg_ref;
+    struct pir_msg msg_ctrl;
+    struct pir_state state;
+    struct {
+        double  q[PIR_AXIS_CNT];
+        double dq[PIR_AXIS_CNT];
+        double user[JS_AXES];
+        uint64_t user_button;
+    } ref;
+
+    struct pir_mode_desc *mode;
+
+    struct timespec now;
+    rfx_ctrl_t G_L;
+    rfx_ctrl_t G_R;
+    rfx_ctrl_ws_lin_k_t K;
+    double q_min[PIR_AXIS_CNT];
+    double q_max[PIR_AXIS_CNT];
+
+    double sint;
+} pirctrl_cx_t;
+
+/*------ MODES --------*/
+typedef void (*pir_ctrl_fun_t)(void);
+typedef void (*pir_mode_fun_t)(pirctrl_cx_t *, struct pir_msg *);
+
+struct pir_mode_desc {
+    const char *name;
+    pir_mode_fun_t setmode;
+    pir_ctrl_fun_t ctrl;
+};
+
+void set_mode_k_s2min(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void set_mode_k_pt(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void set_mode_k_pr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void set_mode_k_q(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void set_mode_cpy(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 
 #endif //PIRANHA_H

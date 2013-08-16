@@ -5,7 +5,7 @@ bin_PROGRAMS = pirctrl pirfilt
 
 noinst_PROGRAMS = pirtest
 
-pirctrl_SOURCES = src/pirctrl.c
+pirctrl_SOURCES = src/pirctrl.c src/setmode.c
 pirctrl_LDADD = -lsns -lach  -lreflex -lamino -lblas -llapack
 
 lib_LTLIBRARIES = libpiranha.la

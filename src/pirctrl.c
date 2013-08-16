@@ -54,37 +54,8 @@
 #include <reflex.h>
 #include "piranha.h"
 
-#define JS_AXES 8
 
-typedef struct {
-    ach_channel_t chan_js;
-    ach_channel_t chan_ref_torso;
-    ach_channel_t chan_ref_left;
-    ach_channel_t chan_ref_right;
-    ach_channel_t chan_state_pir;
-    ach_channel_t chan_ctrl;
-    double dt;
-
-    struct sns_msg_motor_ref *msg_ref;
-    struct pir_msg msg_ctrl;
-    struct pir_state state;
-    struct {
-        double  q[PIR_AXIS_CNT];
-        double dq[PIR_AXIS_CNT];
-        double user[JS_AXES];
-        uint64_t user_button;
-    } ref;
-    struct timespec now;
-    rfx_ctrl_t G_L;
-    rfx_ctrl_t G_R;
-    rfx_ctrl_ws_lin_k_t K;
-    double q_min[PIR_AXIS_CNT];
-    double q_max[PIR_AXIS_CNT];
-
-    double sint;
-} cx_t;
-
-cx_t cx;
+pirctrl_cx_t cx;
 
 
 
@@ -111,6 +82,38 @@ static void ctrl_sin(void);
 static void ctrl_step(void);
 
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
+
+
+struct pir_mode_desc mode_desc[] = {
+    {"left-shoulder",
+     set_mode_cpy,
+     ctrl_joint_left_shoulder},
+    {"left-wrist",
+     set_mode_cpy,
+     ctrl_joint_left_wrist},
+    {"right-shoulder",
+     set_mode_cpy,
+     ctrl_joint_right_shoulder},
+    {"right-wrist",
+     set_mode_cpy,
+     ctrl_joint_right_wrist},
+    {"ws-left",
+     set_mode_ws_left,
+     ctrl_ws_left},
+    {"ws-right",
+     set_mode_ws_right,
+     ctrl_ws_right},
+    {"zero",
+     set_mode_cpy,
+     ctrl_zero},
+    {"sin",
+     set_mode_sin,
+     ctrl_sin},
+    {"step",
+     set_mode_cpy,
+     ctrl_step},
+    {NULL, NULL, NULL} };
+
 
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
 
@@ -293,63 +296,30 @@ static void set_mode(void) {
                                         &frame_size, NULL, ACH_O_LAST );
     if( ACH_OK == r || ACH_MISSED_FRAME == r ) {
         msg_ctrl->mode[63] = '\0';
-        if( 0 == strcmp( "k_s2min", msg_ctrl->mode ) && msg_ctrl->n == 1 ) {
-            printf("k_s2min: %f\n", msg_ctrl->x[0].f );
-            cx.K.s2min = msg_ctrl->x[0].f;
-        } else if( 0 == strcmp( "k_pt", msg_ctrl->mode ) && msg_ctrl->n == 1 ) {
-            printf("k_pt: %f\n", msg_ctrl->x[0].f );
-            aa_fset( cx.K.p, msg_ctrl->x[0].f, 3 );
-        } else if( 0 == strcmp( "k_pr", msg_ctrl->mode ) && msg_ctrl->n == 1 ) {
-            printf("k_pr: %f\n", msg_ctrl->x[0].f );
-            aa_fset( cx.K.p+3, msg_ctrl->x[0].f, 3 );
-        } else if( 0 == strcmp( "k_q", msg_ctrl->mode ) && msg_ctrl->n == 1 ) {
-            printf("k_q: %f\n", msg_ctrl->x[0].f );
-            aa_fset( cx.K.q, msg_ctrl->x[0].f, 7 );
-        } else {
-            // actual mode setting
-            memcpy( &cx.msg_ctrl, msg_ctrl, sizeof(cx.msg_ctrl) );
-            cx.msg_ctrl.mode[63] = '\0';
-            printf("ctrl: %s\n", cx.msg_ctrl.mode );
-
-            if( 0 == strcmp("ws-left", cx.msg_ctrl.mode ) ) {
-                AA_MEM_CPY( cx.G_L.x_r, &cx.state.T_L[9],  3 );
-                aa_tf_rotmat2quat( cx.state.T_L, cx.G_L.r_r );
-            }
-            if( 0 == strcmp("ws-right", cx.msg_ctrl.mode ) ) {
-                AA_MEM_CPY( cx.G_R.x_r, &cx.state.T_R[9],  3 );
-                aa_tf_rotmat2quat( cx.state.T_R, cx.G_R.r_r );
-            }
-            if( 0 == strcmp("sin", cx.msg_ctrl.mode ) ) {
-                cx.sint=0;
+        printf("looking for mode: %s\n",msg_ctrl->mode);
+        for( size_t i = 0; mode_desc[i].name != NULL; i ++ ) {
+            if( 0 == strcmp(msg_ctrl->mode, mode_desc[i].name) ) {
+                printf("found mode: %s\n", mode_desc[i].name);
+                if( mode_desc[i].setmode ) {
+                    mode_desc[i].setmode( &cx, msg_ctrl );
+                }
+                if( mode_desc[i].ctrl ) {
+                    cx.mode = &mode_desc[i];
+                }
+                break;
             }
         }
     }
+
 }
 
 static void control(void) {
     // dispatch
     memset( cx.ref.dq, 0, sizeof(cx.ref.dq[0])*PIR_AXIS_CNT );
-    static const struct  {
-        const char *name;
-        ctrl_fun_t fun;
-    } cmds[] = {
-        {"left-shoulder", ctrl_joint_left_shoulder},
-        {"left-wrist", ctrl_joint_left_wrist},
-        {"right-shoulder", ctrl_joint_right_shoulder},
-        {"right-wrist", ctrl_joint_right_wrist},
-        {"ws-left", ctrl_ws_left},
-        {"ws-right", ctrl_ws_right},
-        {"zero", ctrl_zero},
-        {"sin", ctrl_sin},
-        {"step", ctrl_step},
-        {NULL, NULL} };
-
-    for( size_t i = 0; cmds[i].name != NULL; i ++ ) {
-        if( 0 == strcmp(cx.msg_ctrl.mode, cmds[i].name) ) {
-            cmds[i].fun();
-            break;
-        }
+    if( cx.mode && cx.mode->ctrl ) {
+        cx.mode->ctrl();
     }
+
     // send ref
     sns_msg_set_time( &cx.msg_ref->header, &cx.now, VALID_NS );
     // torso
