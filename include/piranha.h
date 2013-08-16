@@ -90,4 +90,24 @@ void lwa4_tf_abs_( const double *q, const double *T0, double *TT );
 
 
 void lwa4_kin2_( const double *q, const double *T0, const double *Tee, double *T, double *J );
+
+
+enum pir_mode {
+    MODE_HALT = 0,
+    MODE_TORSO = 1,
+    MODE_L_SHOULDER = 2,
+    MODE_L_WRIST = 3,
+    MODE_R_SHOULDER = 4,
+    MODE_R_WRIST = 5,
+};
+
+struct pir_msg {
+    char mode[64];
+    uint64_t n;
+    union {
+        int64_t i;
+        double f;
+    } x [1];
+};
+
 #endif //PIRANHA_H

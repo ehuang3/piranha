@@ -54,23 +54,6 @@
 #include <reflex.h>
 #include "piranha.h"
 
-enum pir_mode {
-    MODE_HALT = 0,
-    MODE_TORSO = 1,
-    MODE_L_SHOULDER = 2,
-    MODE_L_WRIST = 3,
-    MODE_R_SHOULDER = 4,
-    MODE_R_WRIST = 5,
-};
-
-struct pir_msg {
-    char mode[64];
-    union {
-        int64_t i;
-        double f;
-    };
-};
-
 #define JS_AXES 8
 
 typedef struct {
@@ -198,10 +181,16 @@ int main( int argc, char **argv ) {
 
     rfx_ctrl_ws_lin_k_init( &cx.K, 7 );
     aa_fset( cx.K.q, 0.1, 7 );
+    cx.K.q[1] *= 5; // lower limits
+    cx.K.q[3] *= 5; // lower limits
+    cx.K.q[5] *= 5; // lower limits
     cx.K.q[6] *= 5; // this module is most sensitive to limits
-    aa_fset( cx.K.f, -.002, 6 );
-    aa_fset( cx.K.p, 0.5, 3 );
-    aa_fset( cx.K.p+3, 0.5, 3 );
+    //aa_fset( cx.K.f, -.003, 6 );
+    aa_fset( cx.K.f, -.000, 6 );
+    aa_fset( cx.K.p, 1.0, 3 );
+    aa_fset( cx.K.p+3, 1.0, 3 );
+    /* aa_fset( cx.K.p, 0.0, 3 ); */
+    /* aa_fset( cx.K.p+3, 0.0, 3 ); */
     cx.K.dls = .005;
     cx.K.s2min = .01;
     printf("dls s2min: %f\n", cx.K.s2min);
@@ -304,23 +293,23 @@ static void set_mode(void) {
                                         &frame_size, NULL, ACH_O_LAST );
     if( ACH_OK == r || ACH_MISSED_FRAME == r ) {
         msg_ctrl->mode[63] = '\0';
-        if( 0 == strcmp( "k_s2min", msg_ctrl->mode ) ) {
-            printf("k_s2min: %f\n", msg_ctrl->f );
-            cx.K.s2min = msg_ctrl->f;
-        } else if( 0 == strcmp( "k_pt", msg_ctrl->mode ) ) {
-            printf("k_pt: %f\n", msg_ctrl->f );
-            aa_fset( cx.K.p, msg_ctrl->f, 3 );
-        } else if( 0 == strcmp( "k_pr", msg_ctrl->mode ) ) {
-            printf("k_pr: %f\n", msg_ctrl->f );
-            aa_fset( cx.K.p+3, msg_ctrl->f, 3 );
-        } else if( 0 == strcmp( "k_q", msg_ctrl->mode ) ) {
-            printf("k_q: %f\n", msg_ctrl->f );
-            aa_fset( cx.K.q, msg_ctrl->f, 7 );
+        if( 0 == strcmp( "k_s2min", msg_ctrl->mode ) && msg_ctrl->n == 1 ) {
+            printf("k_s2min: %f\n", msg_ctrl->x[0].f );
+            cx.K.s2min = msg_ctrl->x[0].f;
+        } else if( 0 == strcmp( "k_pt", msg_ctrl->mode ) && msg_ctrl->n == 1 ) {
+            printf("k_pt: %f\n", msg_ctrl->x[0].f );
+            aa_fset( cx.K.p, msg_ctrl->x[0].f, 3 );
+        } else if( 0 == strcmp( "k_pr", msg_ctrl->mode ) && msg_ctrl->n == 1 ) {
+            printf("k_pr: %f\n", msg_ctrl->x[0].f );
+            aa_fset( cx.K.p+3, msg_ctrl->x[0].f, 3 );
+        } else if( 0 == strcmp( "k_q", msg_ctrl->mode ) && msg_ctrl->n == 1 ) {
+            printf("k_q: %f\n", msg_ctrl->x[0].f );
+            aa_fset( cx.K.q, msg_ctrl->x[0].f, 7 );
         } else {
             // actual mode setting
             memcpy( &cx.msg_ctrl, msg_ctrl, sizeof(cx.msg_ctrl) );
             cx.msg_ctrl.mode[63] = '\0';
-            printf("ctrl: %s %"PRId64"\n", cx.msg_ctrl.mode, cx.msg_ctrl.i);
+            printf("ctrl: %s\n", cx.msg_ctrl.mode );
 
             if( 0 == strcmp("ws-left", cx.msg_ctrl.mode ) ) {
                 AA_MEM_CPY( cx.G_L.x_r, &cx.state.T_L[9],  3 );
@@ -435,15 +424,26 @@ static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, const double *T, const double *F
 
     // set refs
     AA_MEM_SET( G->dx_r, 0, 6 );
-    if( cx.ref.user_button & GAMEPAD_BUTTON_A ) {
+    if( cx.ref.user_button & GAMEPAD_BUTTON_RB ) {
         G->dx_r[3] = cx.ref.user[GAMEPAD_AXIS_LX] * .3;
         G->dx_r[4] = cx.ref.user[GAMEPAD_AXIS_LY] * .3;
         G->dx_r[5] = cx.ref.user[GAMEPAD_AXIS_RX] * .3;
+
+        G->dx_r[0] = cx.ref.user[GAMEPAD_AXIS_DX] * .02;
+        G->dx_r[1] = cx.ref.user[GAMEPAD_AXIS_DY] * .02;
+        G->dx_r[2] = cx.ref.user[GAMEPAD_AXIS_RY] * .1;
     } else {
         G->dx_r[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .1;
         G->dx_r[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .1;
         G->dx_r[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .1;
     }
+
+    //printf("--\n");
+    //printf("r0:   ");aa_dump_vec(stdout,  G->r, 4 );
+    //printf("x0:   ");aa_dump_vec(stdout,  G->x, 3 );
+    //printf("r_r0: ");aa_dump_vec(stdout,  G->r_r, 4 );
+    ////printf("x_r0: ");aa_dump_vec(stdout,  G->x_r, 3 );
+    //printf("dx_r: ");aa_dump_vec(stdout, G->dx_r, 6 );
 
     // compute stuff
     int r = rfx_ctrl_ws_lin_vfwd( G, &cx.K, &cx.ref.dq[i] );
@@ -451,8 +451,13 @@ static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, const double *T, const double *F
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );
     }
+    //printf("dq:   ");aa_dump_vec(stdout, &cx.ref.dq[i], 7 );
+
     // integrate
     rfx_ctrl_ws_sdx( G, cx.dt );
+
+    //printf("r_r1: ");aa_dump_vec(stdout,  G->r_r, 4 );
+    //printf("x_r1: ");aa_dump_vec(stdout,  G->x_r, 3 );
 }
 
 static void ctrl_ws_left(void) {

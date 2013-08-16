@@ -57,8 +57,7 @@
 
 (cffi:defcstruct pir-message
   (type :char :count 64)
-  (i :int64)
-  )
+  (n :uint64))
 
 (defun pir-set-mode (msg mode)
   (assert (< (length mode) 63))
@@ -71,14 +70,20 @@
        do (setit i (char-code (aref mode i))))
     (setit (length mode) 0)))
 
-(defun pir-message (mode i)
-  (with-foreign-object (msg 'pir-message)
+(defun pir-message (mode &optional data)
+  (with-foreign-pointer (msg (+ (foreign-type-size 'pir-message)
+                                (* 8 (length data)))
+                             msg-size)
     (pir-set-mode msg mode)
-    (etypecase i
-      (fixnum
-       (setf (mem-aref (foreign-slot-pointer msg 'pir-message 'i) :int64)
-             i))
-      (double-float
-       (setf (mem-aref (foreign-slot-pointer msg 'pir-message 'i) :double)
-             i)))
-    (ach::put-pointer *ctrl-channel* msg (foreign-type-size 'pir-message))))
+    (setf (foreign-slot-value msg 'pir-message 'n)
+          (length data))
+    (dotimes (i (length data))
+      (let ((pointer (inc-pointer (foreign-slot-pointer msg 'pir-message 'n)
+                                  (* 8 (1+ i))))
+            (x (elt data i)))
+        (etypecase x
+          (fixnum
+           (setf (mem-aref pointer :int64) x))
+          (double-float
+           (setf (mem-aref pointer :double) x)))))
+    (ach::put-pointer *ctrl-channel* msg msg-size)))
