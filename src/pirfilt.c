@@ -71,6 +71,9 @@ typedef struct {
 
     struct pir_state state;
     struct timespec now;
+
+    double Tee[12];
+    double T0[12];
 } cx_t;
 
 cx_t cx;
@@ -82,8 +85,9 @@ static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
 
 int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
-    memcpy( cx.state.Tee, tf_ident, 12*sizeof(cx.state.Tee[0]) );
-    memcpy( cx.state.T0, tf_ident, 12*sizeof(cx.state.T0[0]) );
+
+    AA_MEM_CPY( cx.Tee, tf_ident, 12 );
+    AA_MEM_CPY( cx.T0, tf_ident, 12 );
 
     /*-- args --*/
     for( int c; -1 != (c = getopt(argc, argv, "V?hH" SNS_OPTSTRING)); ) {
@@ -241,13 +245,16 @@ static void update(void) {
     int u_fr = update_ft( cx.F_raw_R, &cx.chan_ft_right, &timeout );
 
     // update kinematics
-    if( u_l ) lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.state.T0, cx.state.Tee,
-                         cx.state.T_L, cx.state.J_L );
-    if( u_r ) lwa4_kin_( &cx.state.q[PIR_AXIS_R0], cx.state.T0, cx.state.Tee,
-                         cx.state.T_R, cx.state.J_R );
+    double T_L[12], T_R[12];
+    if( u_l ) lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.T0, cx.Tee,
+                         T_L, cx.state.J_L );
+    if( u_r ) lwa4_kin_( &cx.state.q[PIR_AXIS_R0], cx.T0, cx.Tee,
+                         T_R, cx.state.J_R );
+    aa_tf_tfmat2duqu( T_L, cx.state.S_L );
+    aa_tf_tfmat2duqu( T_R, cx.state.S_R );
 
-    if( u_l || u_fl ) rotate_ft( cx.state.T_L, cx.F_raw_L, cx.state.F_L );
-    if( u_r || u_fr ) rotate_ft( cx.state.T_R, cx.F_raw_R, cx.state.F_R );
+    if( u_l || u_fl ) rotate_ft( T_L, cx.F_raw_L, cx.state.F_L );
+    if( u_r || u_fr ) rotate_ft( T_R, cx.F_raw_R, cx.state.F_R );
 
     //if( u_l || u_fl ) aa_dump_vec( stdout, cx.state.F_L, 3 );
 

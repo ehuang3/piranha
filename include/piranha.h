@@ -76,11 +76,13 @@ struct pir_state {
     double F_L[6];
     double F_R[6];
 
-    double Tee[12];
-    double T0[12];
-    double T_L[12];
+    //double Tee[12];
+    //double T0[12];
+
+    double S_L[8];
+    double S_R[8];
+
     double J_L[7*6];
-    double T_R[12];
     double J_R[7*6];
 };
 

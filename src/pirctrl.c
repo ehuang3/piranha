@@ -119,8 +119,6 @@ static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
 
 int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
-    memcpy( cx.state.Tee, tf_ident, 12*sizeof(cx.state.Tee[0]) );
-    memcpy( cx.state.T0, tf_ident, 12*sizeof(cx.state.T0[0]) );
     cx.dt = .002;
 
     /*-- args --*/
@@ -386,10 +384,9 @@ static void ctrl_zero(void) {
 }
 
 
-static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, const double *T, const double *F) {
+static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, const double *S, const double *F) {
     // set actual FK
-    AA_MEM_CPY( G->x, T+9, 3 );
-    aa_tf_rotmat2quat( T, G->r );
+    aa_tf_duqu2qv( S, G->r, G->x );
     AA_MEM_CPY( G->F, F, 6 );
 
     // set refs
@@ -431,11 +428,11 @@ static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, const double *T, const double *F
 }
 
 static void ctrl_ws_left(void) {
-    ctrl_ws( PIR_AXIS_L0, &cx.G_L, cx.state.T_L, cx.state.F_L );
+    ctrl_ws( PIR_AXIS_L0, &cx.G_L, cx.state.S_L, cx.state.F_L );
 }
 
 static void ctrl_ws_right(void) {
-    ctrl_ws( PIR_AXIS_R0, &cx.G_R, cx.state.T_R, cx.state.F_R );
+    ctrl_ws( PIR_AXIS_R0, &cx.G_R, cx.state.S_R, cx.state.F_R );
 }
 
 static void ctrl_sin(void) {

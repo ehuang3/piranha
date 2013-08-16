@@ -93,14 +93,12 @@ void set_mode_cpy(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 }
 
 void set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    AA_MEM_CPY( cx->G_L.x_r, &cx->state.T_L[9],  3 );
-    aa_tf_rotmat2quat( cx->state.T_L, cx->G_L.r_r );
+    aa_tf_duqu2qv( cx->state.S_L, cx->G_L.r_r, cx->G_L.x_r );
     set_mode_cpy(cx,msg_ctrl);
 }
 
 void set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    AA_MEM_CPY( cx->G_R.x_r, &cx->state.T_R[9],  3 );
-    aa_tf_rotmat2quat( cx->state.T_R, cx->G_R.r_r );
+    aa_tf_duqu2qv( cx->state.S_R, cx->G_R.r_r, cx->G_R.x_r );
     set_mode_cpy(cx,msg_ctrl);
 }
 
