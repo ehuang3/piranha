@@ -112,6 +112,12 @@ struct pir_mode_desc mode_desc[] = {
     {"step",
      set_mode_cpy,
      ctrl_step},
+    {"k-pt",
+     set_mode_k_pt,
+     NULL},
+    {"k-pr",
+     set_mode_k_pr,
+     NULL},
     {NULL, NULL, NULL} };
 
 
