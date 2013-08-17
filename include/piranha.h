@@ -126,6 +126,9 @@ typedef struct {
     } ref;
 
     struct pir_mode_desc *mode;
+    struct timespec t0;
+    aa_mem_region_t modereg;
+    rfx_trajx_t *trajx;
 
     struct timespec now;
     rfx_ctrl_t G_L;
@@ -155,5 +158,6 @@ void set_mode_cpy(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 void set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 void set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 void set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 
 #endif //PIRANHA_H

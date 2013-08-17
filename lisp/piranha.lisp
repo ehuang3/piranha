@@ -44,11 +44,15 @@
 
 
 (defparameter *ctrl-channel* nil)
+(defparameter *state-channel* nil)
+
+(defvar *last-traj*)
 
 
 (defun pir-start ()
   (assert (null *ctrl-channel*))
-  (setq *ctrl-channel* (ach::open-channel "pir-ctrl")))
+  (setq *ctrl-channel* (ach::open-channel "pir-ctrl"))
+  (setq *state-channel* (ach::open-channel "pir-state")))
 
 (defun pir-stop ()
   (ach::close-channel *ctrl-channel*)
@@ -58,6 +62,63 @@
 (cffi:defcstruct pir-message
   (type :char :count 64)
   (n :uint64))
+
+
+(cffi:defcstruct pir-cstate
+  (q :double :count 15)
+  (dq :double :count 15)
+
+  (f-l :double :count 6)
+  (f-r :double :count 6)
+
+  (s-l :double :count 8)
+  (s-r :double :count 8)
+
+  (j-l :double :count #.(* 7 6))
+  (j-r :double :count #.(* 7 6)))
+
+
+(defstruct pir-state
+  q         ; joint angles
+  dq        ; joint velocities
+  s-l       ; left pose quaternion
+  s-r       ; right pose quaternion
+  r-l       ; left rotion quaternion
+  r-r       ; right rotion quaternion
+  x-l       ; left translation vector
+  x-r       ; righ5 translation vector
+  )
+
+
+(defun read-doubles (pointer size)
+  (let ((x (make-array size :element-type 'double-float)))
+    (dotimes (i size)
+      (setf (aref x i)
+            (mem-aref pointer :double i)))
+    x))
+
+
+(defun get-state ()
+  (with-foreign-object (state 'pir-cstate)
+    (ach:get-pointer *state-channel* state (foreign-type-size 'pir-cstate)
+                     :wait t :last t)
+    (labels ((extract (x n)
+               (read-doubles (foreign-slot-pointer state 'pir-cstate x) n)))
+      (let ((s-l (extract 's-l 8))
+            (s-r (extract 's-r 8)))
+        (multiple-value-bind (r-l x-l) (amino::tf-duqu2qv s-l)
+          (multiple-value-bind (r-r x-r) (amino::tf-duqu2qv s-r)
+            (make-pir-state
+             :q (extract 'q 15)
+             :dq (extract 'dq 15)
+             :s-l s-l
+             :s-r s-r
+             :r-l r-l
+             :r-r r-r
+             :x-l x-l
+             :x-r x-r)))))))
+
+
 
 (defun pir-set-mode (msg mode)
   (assert (< (length mode) 63))
@@ -87,3 +148,13 @@
           (double-float
            (setf (mem-aref pointer :double) x)))))
     (ach::put-pointer *ctrl-channel* msg msg-size)))
+
+
+
+(defun pir-go-rel (x)
+  (check-type x amino::point-3)
+  (let ((state (get-state)))
+    (let* ((S-rel (amino::tf-qv2duqu amino::+tf-quat-ident+ x))
+           (S-1 (amino::tf-duqu-mul (pir-state-s-l state) S-rel)))
+      (setq *last-traj* (list  (pir-state-s-l state) S-1))
+      (pir-message "trajx" (amino::matrix-data S-1)))))

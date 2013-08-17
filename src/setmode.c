@@ -106,3 +106,48 @@ void set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     cx->sint=0;
     set_mode_cpy(cx,msg_ctrl);
 }
+
+void set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    if( msg_ctrl->n != 8 ) return;
+    double S_rel[8], xr[3];
+    double *S1 = &msg_ctrl->x[0].f;
+    aa_tf_duqu_cmul( cx->state.S_L, S1, S_rel );
+    aa_tf_duqu_trans( S_rel, xr );
+    printf("xrel: "); aa_dump_vec( stdout, xr, 3 );
+    printf("qrel: "); aa_dump_vec( stdout, S_rel, 4 );
+    printf("S0: "); aa_dump_vec( stdout, cx->state.S_L, 8 );
+    printf("S1: "); aa_dump_vec( stdout, S1, 8 );
+
+
+    // free old stuff
+    aa_mem_region_release( &cx->modereg );
+
+    // aloc
+    rfx_trajx_parablend_t *T = AA_MEM_REGION_NEW( &cx->modereg, rfx_trajx_parablend_t );
+    rfx_trajx_splend_init( T, &cx->modereg, 1 );
+
+    rfx_trajx_t *pT = (rfx_trajx_t*)T;
+
+    // initial point
+    double r0[4], x0[3];
+    aa_tf_duqu2qv( cx->state.S_L, r0, x0 );
+    rfx_trajx_add( pT, 0, x0, r0 );
+
+    // final point
+    double r1[4], x1[3];
+    aa_tf_duqu2qv( S1, r1, x1 );
+    rfx_trajx_add( pT, 5, x1, r1 );
+
+    // generate
+    rfx_trajx_generate( pT );
+
+    // debugging plot
+    {
+        //struct rfx_trajx_plot_opts xopts = {0};
+        //xopts.to_file = 1;
+        //rfx_trajx_plot( pT, .001, &xopts );
+    }
+    memcpy( &cx->t0, &cx->now, sizeof(cx->t0) );
+
+    cx->trajx = pT;
+}

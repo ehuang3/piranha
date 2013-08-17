@@ -80,6 +80,7 @@ static void ctrl_ws_right(void);
 static void ctrl_zero(void);
 static void ctrl_sin(void);
 static void ctrl_step(void);
+static void ctrl_trajx(void);
 
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
 
@@ -112,6 +113,9 @@ struct pir_mode_desc mode_desc[] = {
     {"step",
      set_mode_cpy,
      ctrl_step},
+    {"trajx",
+     set_mode_trajx,
+     ctrl_trajx},
     {"k-pt",
      set_mode_k_pt,
      NULL},
@@ -153,6 +157,9 @@ int main( int argc, char **argv ) {
     // alloc messages
     cx.msg_ref = sns_msg_motor_ref_alloc( PIR_MAX_MSG_AXES );
     cx.msg_ref->mode = SNS_MOTOR_MODE_VEL;
+
+    // memory
+    aa_mem_region_init( &cx.modereg, 64 * 1024 );
 
     // setup reflex controller
     for( size_t i = 0; i < PIR_AXIS_CNT; i ++ ) {
@@ -469,5 +476,33 @@ static void ctrl_step(void) {
         aa_fset(& cx.ref.dq[PIR_AXIS_L0], -15 * M_PI/180, 7 );
     }
 
+
+}
+
+static void ctrl_trajx(void) {
+    double t = aa_tm_timespec2sec( aa_tm_sub( cx.now, cx.t0 ) );
+
+    if( t >= cx.trajx->pt_f->t ) return;
+
+    // get refs
+    double S[8], dx[6];
+    rfx_trajx_get_x_duqu( cx.trajx, t, S );
+    rfx_trajx_get_dx( cx.trajx, t, dx );
+
+    // store refs
+    aa_tf_duqu2qv( S, cx.G_L.r_r, cx.G_L.x_r );
+    AA_MEM_CPY( cx.G_L.dx_r, dx, 6 );
+
+    // store actual
+    aa_tf_duqu2qv( cx.state.S_L, cx.G_L.r, cx.G_L.x );
+
+
+    int r = rfx_ctrl_ws_lin_vfwd( &cx.G_L, &cx.K, &cx.ref.dq[PIR_AXIS_L0] );
+    if( RFX_OK != r ) {
+        SNS_LOG( LOG_ERR, "ws error: %s\n",
+                 rfx_status_string((rfx_status_t)r) );
+    }
+    //printf("trajx: "); aa_dump_vec(stdout, dx, 6 );
+    //printf("dq: "); aa_dump_vec(stdout, &cx.ref.dq[PIR_AXIS_L0], 8 );
 
 }
