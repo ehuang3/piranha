@@ -149,17 +149,55 @@
            (setf (mem-aref pointer :double) x)))))
     (ach::put-pointer *ctrl-channel* msg msg-size)))
 
+(defstruct trajx-point
+  pose
+  time)
 
+(defun trajx-point-data (points)
+  (let* ((n (length points))
+         (data (amino::make-vec (* 9 (length points)))))
+    (dotimes (i n)
+      (let ((point (elt points i))
+            (offset (* i n)))
+        (setf (aref data offset)
+              (trajx-point-time point))
+        (replace data (amino::matrix-data (trajx-point-pose point))
+                 :start1 (+ 1 offset) :end1 (+ 9 offset))))
+    data))
+
+(defun pir-go (points &key
+               (state (get-state)))
+  (setq *last-traj* (append (list (make-trajx-point :pose (pir-state-s-l state)
+                                                    :time 0d0))
+                            points))
+  (pir-message "trajx" (trajx-point-data points)))
 
 (defun pir-go-rel (&key
                    (x (amino::col-vector 0 0 0))
+                   (time 5d0)
                    (r amino::+tf-quat-ident+))
   (let ((state (get-state)))
     (let* ((S-rel (amino::tf-qv2duqu r x))
            (S-1 (amino::tf-duqu-mul (pir-state-s-l state) S-rel)))
-      (setq *last-traj* (list  (pir-state-s-l state) S-1))
-      (pir-message "trajx" (amino::matrix-data S-1)))))
+      (pir-go (list (make-trajx-point :pose S-1
+                                      :time time))
+              :state state))))
 
-(defun pir-screw (x theta)
+(defun pir-screw (x theta &key (time 5d0))
   (pir-go-rel :x (amino::col-vector x 0 0)
-              :r (amino::tf-rotmat2quat (amino::tf-xangle2rotmat theta))))
+              :r (amino::tf-xangle2quat theta)
+              :time time))
+
+(defun pir-rotate (r &key (time 10d0))
+  (let ((state (get-state)))
+    (pir-go (list (make-trajx-point :pose (amino::tf-qv2duqu r (pir-state-x-l state))
+                                    :time time))
+            :state state)))
+
+
+(defun pir-set (q &key (time 10d0))
+  (check-type q (simple-array double-float (7)))
+  (let ((vec (amino::make-vec 8)))
+    (setf (aref vec 0) time)
+    (replace vec q :start1 1)
+    (pir-message "trajq" vec)))

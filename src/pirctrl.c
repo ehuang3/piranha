@@ -81,6 +81,7 @@ static void ctrl_zero(void);
 static void ctrl_sin(void);
 static void ctrl_step(void);
 static void ctrl_trajx(void);
+static void ctrl_trajq(void);
 
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
 
@@ -116,6 +117,9 @@ struct pir_mode_desc mode_desc[] = {
     {"trajx",
      set_mode_trajx,
      ctrl_trajx},
+    {"trajq",
+     set_mode_trajq,
+     ctrl_trajq},
     {"k-pt",
      set_mode_k_pt,
      NULL},
@@ -205,24 +209,27 @@ int main( int argc, char **argv ) {
         cx.G_R.x_max[i] = 10;
     }
 
-    rfx_ctrl_ws_lin_k_init( &cx.K, 7 );
-    aa_fset( cx.K.q, 0.1, 7 );
-    cx.K.q[1] *= 5; // lower limits
-    cx.K.q[3] *= 5; // lower limits
-    cx.K.q[5] *= 5; // lower limits
-    cx.K.q[6] *= 5; // this module is most sensitive to limits
+    rfx_ctrl_ws_lin_k_init( &cx.Kx, 7 );
+    aa_fset( cx.Kx.q, 0.1, 7 );
+    cx.Kx.q[1] *= 5; // lower limits
+    cx.Kx.q[3] *= 5; // lower limits
+    cx.Kx.q[5] *= 5; // lower limits
+    cx.Kx.q[6] *= 5; // this module is most sensitive to limits
     //aa_fset( cx.K.f, -.003, 6 );
-    aa_fset( cx.K.f, -.000, 6 );
-    aa_fset( cx.K.p, 1.0, 3 );
-    aa_fset( cx.K.p+3, 1.0, 3 );
+    aa_fset( cx.Kx.f, -.000, 6 );
+    aa_fset( cx.Kx.p, 1.0, 3 );
+    aa_fset( cx.Kx.p+3, 1.0, 3 );
     /* aa_fset( cx.K.p, 0.0, 3 ); */
     /* aa_fset( cx.K.p+3, 0.0, 3 ); */
-    cx.K.dls = .005;
-    cx.K.s2min = .01;
-    printf("dls s2min: %f\n", cx.K.s2min);
-    printf("dls k: %f\n", cx.K.dls);
+    cx.Kx.dls = .005;
+    cx.Kx.s2min = .01;
+    printf("dls s2min: %f\n", cx.Kx.s2min);
+    printf("dls k: %f\n", cx.Kx.dls);
 
-
+    // joint
+    cx.Kq.n_q = 7;
+    cx.Kq.p = AA_NEW_AR( double, 7 );
+    AA_MEM_SET( cx.Kq.p, 0, 7 );
     if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
         SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
 
@@ -324,10 +331,11 @@ static void set_mode(void) {
             if( 0 == strcmp(msg_ctrl->mode, mode_desc[i].name) ) {
                 printf("found mode: %s\n", mode_desc[i].name);
                 if( mode_desc[i].setmode ) {
-                    mode_desc[i].setmode( &cx, msg_ctrl );
-                }
-                if( mode_desc[i].ctrl ) {
-                    cx.mode = &mode_desc[i];
+                    if( 0 == mode_desc[i].setmode( &cx, msg_ctrl ) &&
+                        mode_desc[i].ctrl )
+                    {
+                        cx.mode = &mode_desc[i];
+                    }
                 }
                 break;
             }
@@ -434,7 +442,7 @@ static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G ) {
     //printf("dx_r: ");aa_dump_vec(stdout, G->dx_r, 6 );
 
     // compute stuff
-    int r = rfx_ctrl_ws_lin_vfwd( G, &cx.K, &cx.ref.dq[i] );
+    int r = rfx_ctrl_ws_lin_vfwd( G, &cx.Kx, &cx.ref.dq[i] );
     if( RFX_OK != r ) {
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );
@@ -490,18 +498,41 @@ static void ctrl_step(void) {
 static void ctrl_trajx(void) {
     double t = aa_tm_timespec2sec( aa_tm_sub( cx.now, cx.t0 ) );
 
-    if( t >= cx.trajx->pt_f->t ) return;
 
     // get refs
-    double S[8], dx[6];
-    rfx_trajx_get_x_duqu( cx.trajx, t, S );
-    rfx_trajx_get_dx( cx.trajx, t, dx );
+    if( t >= cx.trajx->pt_f->t ) {
+        aa_tf_qv2duqu( cx.trajx->pt_f->r, cx.trajx->pt_f->x, cx.G_L.ref.S );
+        AA_MEM_SET( cx.G_L.ref.dx, 0, 6 );
+    } else {
+        rfx_trajx_get_x_duqu( cx.trajx, t, cx.G_L.ref.S );
+        rfx_trajx_get_dx( cx.trajx, t, cx.G_L.ref.dx );
+    }
 
-    // store refs
-    AA_MEM_CPY( cx.G_L.ref.S, S, 8 );
-    AA_MEM_CPY( cx.G_L.ref.dx, dx, 6 );
 
-    int r = rfx_ctrl_ws_lin_vfwd( &cx.G_L, &cx.K, &cx.ref.dq[PIR_AXIS_L0] );
+    int r = rfx_ctrl_ws_lin_vfwd( &cx.G_L, &cx.Kx, &cx.ref.dq[PIR_AXIS_L0] );
+    if( RFX_OK != r ) {
+        SNS_LOG( LOG_ERR, "ws error: %s\n",
+                 rfx_status_string((rfx_status_t)r) );
+    }
+    //printf("trajx: "); aa_dump_vec(stdout, dx, 6 );
+    //printf("dq: "); aa_dump_vec(stdout, &cx.ref.dq[PIR_AXIS_L0], 8 );
+
+}
+
+static void ctrl_trajq(void) {
+    double t = aa_tm_timespec2sec( aa_tm_sub( cx.now, cx.t0 ) );
+
+    if( t >= cx.trajq->t_f ) {
+        AA_MEM_CPY( cx.G_L.ref.q, cx.trajq->q_f, 7 );
+        AA_MEM_SET( cx.G_L.ref.dq, 0, 7 );
+    } else {
+        // get refs
+        rfx_trajq_get_q( cx.trajq, t, cx.G_L.ref.q );
+        rfx_trajq_get_dq( cx.trajq, t, cx.G_L.ref.dq );
+    }
+
+
+    int r = rfx_ctrlq_lin_vfwd( &cx.G_L, &cx.Kq, &cx.ref.dq[PIR_AXIS_L0] );
     if( RFX_OK != r ) {
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );

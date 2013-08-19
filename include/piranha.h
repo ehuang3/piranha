@@ -129,11 +129,13 @@ typedef struct {
     struct timespec t0;
     aa_mem_region_t modereg;
     rfx_trajx_t *trajx;
+    rfx_trajq_t *trajq;
 
     struct timespec now;
     rfx_ctrl_t G_L;
     rfx_ctrl_t G_R;
-    rfx_ctrl_ws_lin_k_t K;
+    rfx_ctrl_ws_lin_k_t Kx;
+    rfx_ctrlq_lin_k_t Kq;
     double q_min[PIR_AXIS_CNT];
     double q_max[PIR_AXIS_CNT];
 
@@ -142,7 +144,7 @@ typedef struct {
 
 /*------ MODES --------*/
 typedef void (*pir_ctrl_fun_t)(void);
-typedef void (*pir_mode_fun_t)(pirctrl_cx_t *, struct pir_msg *);
+typedef int (*pir_mode_fun_t)(pirctrl_cx_t *, struct pir_msg *);
 
 struct pir_mode_desc {
     const char *name;
@@ -150,14 +152,15 @@ struct pir_mode_desc {
     pir_ctrl_fun_t ctrl;
 };
 
-void set_mode_k_s2min(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
-void set_mode_k_pt(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
-void set_mode_k_pr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
-void set_mode_k_q(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
-void set_mode_cpy(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
-void set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
-void set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
-void set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
-void set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_k_s2min(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_k_pt(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_k_pr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_k_q(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_cpy(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 
 #endif //PIRANHA_H
