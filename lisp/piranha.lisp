@@ -151,10 +151,15 @@
 
 
 
-(defun pir-go-rel (x)
-  (check-type x amino::point-3)
+(defun pir-go-rel (&key
+                   (x (amino::col-vector 0 0 0))
+                   (r amino::+tf-quat-ident+))
   (let ((state (get-state)))
-    (let* ((S-rel (amino::tf-qv2duqu amino::+tf-quat-ident+ x))
+    (let* ((S-rel (amino::tf-qv2duqu r x))
            (S-1 (amino::tf-duqu-mul (pir-state-s-l state) S-rel)))
       (setq *last-traj* (list  (pir-state-s-l state) S-1))
       (pir-message "trajx" (amino::matrix-data S-1)))))
+
+(defun pir-screw (x theta)
+  (pir-go-rel :x (amino::col-vector x 0 0)
+              :r (amino::tf-rotmat2quat (amino::tf-xangle2rotmat theta))))

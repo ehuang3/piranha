@@ -169,12 +169,18 @@ int main( int argc, char **argv ) {
     // left
     cx.G_L.n_q = 7;
     cx.G_L.J =  cx.state.J_L;
-    cx.G_L.q =  &cx.state.q[PIR_AXIS_L0];
-    cx.G_L.dq = &cx.state.dq[PIR_AXIS_L0];
-    cx.G_L.q_r =  &cx.ref.q[PIR_AXIS_L0];
-    cx.G_L.dq_r = &cx.ref.dq[PIR_AXIS_L0];
+    cx.G_L.act.q =  &cx.state.q[PIR_AXIS_L0];
+    cx.G_L.act.dq = &cx.state.dq[PIR_AXIS_L0];
+    cx.G_L.act.S = cx.state.S_L;
+    cx.G_L.act.F = cx.state.F_L;
+    cx.G_L.ref.q =  &cx.ref.q[PIR_AXIS_L0];
+    cx.G_L.ref.dq = &cx.ref.dq[PIR_AXIS_L0];
     cx.G_L.q_min = &cx.q_min[PIR_AXIS_L0];
     cx.G_L.q_max = &cx.q_max[PIR_AXIS_L0];
+    cx.G_L.ref.S = AA_NEW0_AR( double, 8 );
+    cx.G_L.ref.F = AA_NEW0_AR( double, 6 );
+    cx.G_L.ref.dx = AA_NEW0_AR( double, 6 );
+    cx.G_L.act.dx = AA_NEW0_AR( double, 6 );
     for( size_t i = 0; i < 3; i ++ ) {
         cx.G_L.x_min[i] = -10;
         cx.G_L.x_max[i] = 10;
@@ -182,12 +188,18 @@ int main( int argc, char **argv ) {
     // right
     cx.G_R.n_q = 7;
     cx.G_R.J =  cx.state.J_R;
-    cx.G_R.q =  &cx.state.q[PIR_AXIS_R0];
-    cx.G_R.dq = &cx.state.dq[PIR_AXIS_R0];
-    cx.G_R.q_r =  &cx.ref.q[PIR_AXIS_R0];
-    cx.G_R.dq_r = &cx.ref.dq[PIR_AXIS_R0];
+    cx.G_R.act.q =  &cx.state.q[PIR_AXIS_R0];
+    cx.G_R.act.dq = &cx.state.dq[PIR_AXIS_R0];
+    cx.G_R.act.S = cx.state.S_R;
+    cx.G_R.act.F = cx.state.F_R;
+    cx.G_R.ref.q =  &cx.ref.q[PIR_AXIS_R0];
+    cx.G_R.ref.dq = &cx.ref.dq[PIR_AXIS_R0];
     cx.G_R.q_min = &cx.q_min[PIR_AXIS_R0];
     cx.G_R.q_max = &cx.q_max[PIR_AXIS_R0];
+    cx.G_R.ref.S = AA_NEW0_AR( double, 8 );
+    cx.G_R.ref.F = AA_NEW0_AR( double, 6 );
+    cx.G_R.ref.dx = AA_NEW0_AR( double, 6 );
+    cx.G_R.act.dx = AA_NEW0_AR( double, 6 );
     for( size_t i = 0; i < 3; i ++ ) {
         cx.G_R.x_min[i] = -10;
         cx.G_R.x_max[i] = 10;
@@ -397,25 +409,21 @@ static void ctrl_zero(void) {
 }
 
 
-static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, const double *S, const double *F) {
-    // set actual FK
-    aa_tf_duqu2qv( S, G->r, G->x );
-    AA_MEM_CPY( G->F, F, 6 );
-
+static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G ) {
     // set refs
-    AA_MEM_SET( G->dx_r, 0, 6 );
+    AA_MEM_SET( G->ref.dx, 0, 6 );
     if( cx.ref.user_button & GAMEPAD_BUTTON_RB ) {
-        G->dx_r[3] = cx.ref.user[GAMEPAD_AXIS_LX] * .3;
-        G->dx_r[4] = cx.ref.user[GAMEPAD_AXIS_LY] * .3;
-        G->dx_r[5] = cx.ref.user[GAMEPAD_AXIS_RX] * .3;
+        G->ref.dx[3] = cx.ref.user[GAMEPAD_AXIS_LX] * .3;
+        G->ref.dx[4] = cx.ref.user[GAMEPAD_AXIS_LY] * .3;
+        G->ref.dx[5] = cx.ref.user[GAMEPAD_AXIS_RX] * .3;
 
-        G->dx_r[0] = cx.ref.user[GAMEPAD_AXIS_DX] * .02;
-        G->dx_r[1] = cx.ref.user[GAMEPAD_AXIS_DY] * .02;
-        G->dx_r[2] = cx.ref.user[GAMEPAD_AXIS_RY] * .1;
+        G->ref.dx[0] = cx.ref.user[GAMEPAD_AXIS_DX] * .02;
+        G->ref.dx[1] = cx.ref.user[GAMEPAD_AXIS_DY] * .02;
+        G->ref.dx[2] = cx.ref.user[GAMEPAD_AXIS_RY] * .1;
     } else {
-        G->dx_r[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .1;
-        G->dx_r[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .1;
-        G->dx_r[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .1;
+        G->ref.dx[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .1;
+        G->ref.dx[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .1;
+        G->ref.dx[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .1;
     }
 
     //printf("--\n");
@@ -441,11 +449,11 @@ static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G, const double *S, const double *F
 }
 
 static void ctrl_ws_left(void) {
-    ctrl_ws( PIR_AXIS_L0, &cx.G_L, cx.state.S_L, cx.state.F_L );
+    ctrl_ws( PIR_AXIS_L0, &cx.G_L );
 }
 
 static void ctrl_ws_right(void) {
-    ctrl_ws( PIR_AXIS_R0, &cx.G_R, cx.state.S_R, cx.state.F_R );
+    ctrl_ws( PIR_AXIS_R0, &cx.G_R );
 }
 
 static void ctrl_sin(void) {
@@ -490,12 +498,8 @@ static void ctrl_trajx(void) {
     rfx_trajx_get_dx( cx.trajx, t, dx );
 
     // store refs
-    aa_tf_duqu2qv( S, cx.G_L.r_r, cx.G_L.x_r );
-    AA_MEM_CPY( cx.G_L.dx_r, dx, 6 );
-
-    // store actual
-    aa_tf_duqu2qv( cx.state.S_L, cx.G_L.r, cx.G_L.x );
-
+    AA_MEM_CPY( cx.G_L.ref.S, S, 8 );
+    AA_MEM_CPY( cx.G_L.ref.dx, dx, 6 );
 
     int r = rfx_ctrl_ws_lin_vfwd( &cx.G_L, &cx.K, &cx.ref.dq[PIR_AXIS_L0] );
     if( RFX_OK != r ) {
