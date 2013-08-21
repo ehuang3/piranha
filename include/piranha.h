@@ -48,6 +48,8 @@
 
 #define PIR_MAX_MSG_AXES 7
 
+#define PIR_FT_WEIGHT 4
+
 enum pir_axis {
     PIR_AXIS_T  =   0,
     PIR_AXIS_L0 =   1,

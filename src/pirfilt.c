@@ -61,25 +61,35 @@ typedef struct {
     ach_channel_t chan_state_right;
     ach_channel_t chan_ft_left;
     ach_channel_t chan_ft_right;
+    ach_channel_t chan_ftbias_left;
+    ach_channel_t chan_ftbias_right;
     ach_channel_t chan_state_pir;
 
 
     double F_raw_L[6]; ///< raw F/T reading, left
     double F_raw_R[6]; ///< raw F/T reading, right
 
-    double R_ft[9];    ///< Rotation from E.E. to F/T
+    double R_ft_rel[9];    ///< Rotation from E.E. to F/T
+
+    double R_ft_L[9];    ///< Absolute F/T rotation
+    double R_ft_R[9];    ///< Absolute F/T rotation
 
     struct pir_state state;
     struct timespec now;
 
     double Tee[12];
     double T0[12];
+
+    sig_atomic_t rebias;
 } cx_t;
 
 cx_t cx;
 
 static void update(void);
 static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts);
+
+static void sighandler_hup ( int sig );
+static int bias_ft( void );
 
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
 static const double tf_0[] = {0,1,0, 0,0,-1, -1,0,0, 0,0,0};
@@ -102,14 +112,17 @@ int main( int argc, char **argv ) {
         }
     }
 
+    sns_init();
     sns_start();
 
     // open channel
     sns_chan_open( &cx.chan_state_torso, "state-torso", NULL );
     sns_chan_open( &cx.chan_state_left,  "state-left",  NULL );
     sns_chan_open( &cx.chan_state_right, "state-right", NULL );
-    sns_chan_open( &cx.chan_ft_left,  "ft-left",  NULL );
-    sns_chan_open( &cx.chan_ft_right, "ft-right", NULL );
+    sns_chan_open( &cx.chan_ft_left,      "ft-left",  NULL );
+    sns_chan_open( &cx.chan_ft_right,     "ft-right", NULL );
+    sns_chan_open( &cx.chan_ftbias_left,  "ft-bias-left",  NULL );
+    sns_chan_open( &cx.chan_ftbias_right, "ft-bias-right", NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",  NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_left, &cx.chan_state_torso, NULL};
@@ -126,15 +139,27 @@ int main( int argc, char **argv ) {
 
         double Rrot[9];
         aa_tf_zangle2rotmat(15*M_PI/180, Rrot);
-        aa_tf_9mul( R0, Rrot, cx.R_ft );
-
-        //AA_MEM_CPY( cx.R_ft, R0, 9 );
-
+        aa_tf_9mul( R0, Rrot, cx.R_ft_rel );
     }
+
+
+    /* Register signal handler */
+    {
+        struct sigaction act;
+        memset(&act, 0, sizeof(act));
+        act.sa_handler = &sighandler_hup;
+        if( sigaction(SIGHUP, &act, NULL) ) {
+            SNS_DIE( "Could not install signal handler\n");
+        }
+    }
+
 
     /* -- RUN -- */
     while (!sns_cx.shutdown) {
         update();
+        if( cx.rebias ) {
+            bias_ft();
+        }
         aa_mem_region_local_release();
     }
 
@@ -176,6 +201,7 @@ static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts
     }
     case ACH_TIMEOUT:
     case ACH_STALE_FRAMES:
+    case ACH_CANCELED:
         break;
     default:
         SNS_LOG(LOG_ERR, "Failed ach_get: %s\n", ach_result_to_string(r) );
@@ -209,6 +235,7 @@ static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
     }
     case ACH_TIMEOUT:
     case ACH_STALE_FRAMES:
+    case ACH_CANCELED:
         break;
     default:
         SNS_LOG(LOG_ERR, "Failed ach_get: %s\n", ach_result_to_string(r) );
@@ -216,19 +243,15 @@ static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
     return 0;
 }
 
-static void rotate_ft( const double *R_arm, const double *F_raw, double *F ) {
-    double F_tmp[6];
-    aa_tf_9rot( cx.R_ft, F_raw,   F_tmp );
-    aa_tf_9rot( cx.R_ft, F_raw+3, F_tmp+3 );
+static void rotate_ft( const double *R_ft, const double *F_raw, double *F ) {
+    // rotate
+    aa_tf_9rot( R_ft, F_raw,   F);
+    aa_tf_9rot( R_ft, F_raw+3, F+3 );
 
-    //aa_dump_vec( stdout, F_tmp, 3 );
-    /* printf("%f\t%f\t%f\t|\t%f\t%f\t%f\n", */
-    /*         F_raw[0], F_raw[1], F_raw[2], */
-    /*         F_tmp[0], F_tmp[1], F_tmp[2] ); */
+    // subtract end-effector mass
+    F[2] += PIR_FT_WEIGHT;
 
-
-    aa_tf_9rot( R_arm, F_tmp,   F );
-    aa_tf_9rot( R_arm, F_tmp+3, F+3 );
+    // TODO: torque
 }
 
 static void update(void) {
@@ -250,15 +273,23 @@ static void update(void) {
 
     // update kinematics
     double T_L[12], T_R[12];
-    if( u_l ) lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.T0, cx.Tee,
-                         T_L, cx.state.J_L );
-    if( u_r ) lwa4_kin_( &cx.state.q[PIR_AXIS_R0], cx.T0, cx.Tee,
-                         T_R, cx.state.J_R );
-    aa_tf_tfmat2duqu( T_L, cx.state.S_L );
-    aa_tf_tfmat2duqu( T_R, cx.state.S_R );
+    if( u_l ) {
+        lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.T0, cx.Tee,
+                   T_L, cx.state.J_L );
+        aa_tf_9mul( T_L, cx.R_ft_rel, cx.R_ft_L );
+        aa_tf_tfmat2duqu( T_L, cx.state.S_L );
+    }
+    if( u_r ) {
+        lwa4_kin_( &cx.state.q[PIR_AXIS_R0], cx.T0, cx.Tee,
+                   T_R, cx.state.J_R );
+        aa_tf_9mul( T_R, cx.R_ft_rel, cx.R_ft_R );
+        aa_tf_tfmat2duqu( T_R, cx.state.S_R );
+    }
 
-    if( u_l || u_fl ) rotate_ft( T_L, cx.F_raw_L, cx.state.F_L );
-    if( u_r || u_fr ) rotate_ft( T_R, cx.F_raw_R, cx.state.F_R );
+    if( u_l || u_fl ) rotate_ft( cx.R_ft_L, cx.F_raw_L, cx.state.F_L );
+    if( u_r || u_fr ) rotate_ft( cx.R_ft_R, cx.F_raw_R, cx.state.F_R );
+
+
 
     //if( u_l || u_fl ) aa_dump_vec( stdout, cx.state.F_L, 3 );
 
@@ -273,4 +304,45 @@ static void update(void) {
             SNS_LOG( LOG_ERR, "Couldn't put ach frame: %s\n", ach_result_to_string(r) );
         }
     }
+}
+
+
+static int bias_ft( void ) {
+    // F = -weight * k
+    size_t n_msg = sns_msg_vector_size_n(6);
+    struct sns_msg_vector *msg = (struct sns_msg_vector*) alloca(n_msg);
+    msg->n = 6;
+    sns_msg_header_fill(&msg->header);
+    //sns_msg_set_time( &msg->header, &t_actual, 2*period_ns );
+
+    // Expected force in absolute frame
+    double F[6] = {0};
+    F[2] = - PIR_FT_WEIGHT;
+
+    // Rotate force to F/T frame
+    // F_abs = R_ft * F_ft  => R_ft^T * F_abs = F_ft
+    double R_ft_T[9];
+    aa_la_transpose2( 3, 3, cx.R_ft_L, R_ft_T );
+    aa_tf_9rot( R_ft_T, F, msg->x );
+    aa_tf_9rot( R_ft_T, F+3, msg->x+3 );
+
+    // send message
+    ach_status_t r = ach_put( &cx.chan_ftbias_left, msg, n_msg );
+    if( ACH_OK != r ) {
+        SNS_LOG( LOG_ERR, "Couldn't send ach frame: %s\n", ach_result_to_string(r) );
+    }
+
+    // reset bias flag
+    cx.rebias = 0;
+
+    return 0;
+}
+
+static void sighandler_hup ( int sig ) {
+    (void)sig;
+    if( SNS_LOG_PRIORITY(LOG_DEBUG) ) {
+        const char buf[] = "Received sighup\n";
+        write(STDERR_FILENO, buf, sizeof(buf)); /* write is async safe, xprintf family is not */
+    }
+    cx.rebias = 1;
 }
