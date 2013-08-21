@@ -82,12 +82,16 @@ static void update(void);
 static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts);
 
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
+static const double tf_0[] = {0,1,0, 0,0,-1, -1,0,0, 0,0,0};
 
 int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
 
+    assert( aa_tf_isrotmat( tf_0 ) );
+
     AA_MEM_CPY( cx.Tee, tf_ident, 12 );
-    AA_MEM_CPY( cx.T0, tf_ident, 12 );
+    AA_MEM_CPY( cx.T0, tf_0, 12 );
+
 
     /*-- args --*/
     for( int c; -1 != (c = getopt(argc, argv, "V?hH" SNS_OPTSTRING)); ) {
