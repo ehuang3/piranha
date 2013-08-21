@@ -55,6 +55,24 @@ pir_ach_mk() {
     ach  mk -1 -o 666 pir-state
     ach  mk -1 -o 666 ft-left
     ach  mk -1 -o 666 ft-right
+    ach  mk -1 -o 666 ft-bias-left
+    ach  mk -1 -o 666 ft-bias-right
+}
+
+pir_ach_rm() {
+    ach rm ref-torso
+    ach rm state-torso
+    ach rm ref-left
+    ach rm state-left
+    ach rm ref-right
+    ach rm state-right
+    ach rm joystick
+    ach rm pir-ctrl
+    ach rm pir-state
+    ach rm ft-left
+    ach rm ft-right
+    ach rm ft-bias-left
+    ach rm ft-bias-right
 }
 
 CAN_L=can0
@@ -67,9 +85,9 @@ pir_start() {
     $SNS run -d -r lwa-right -- \
         can402 -f $CAN_R -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-right -s state-right
     $SNS run -d -r ft-left -- \
-        cftd -f $CAN_L -n 27 -c ft-left
+        cftd -f $CAN_L -n 27 -c ft-left -b ft-bias-left
     $SNS run -d -r ft-right -- \
-        cftd -f $CAN_R -n 27 -c ft-right
+        cftd -f $CAN_R -n 27 -c ft-right -b ft-bias-right
 }
 
 pir_stop() {
