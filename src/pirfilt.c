@@ -69,16 +69,16 @@ typedef struct {
     double F_raw_L[6]; ///< raw F/T reading, left
     double F_raw_R[6]; ///< raw F/T reading, right
 
-    double R_ft_rel[9];    ///< Rotation from E.E. to F/T
+    double r_ft_rel[4];    ///< Rotation from E.E. to F/T
 
-    double R_ft_L[9];    ///< Absolute F/T rotation
-    double R_ft_R[9];    ///< Absolute F/T rotation
+    double r_ft_L[4];    ///< Absolute F/T rotation
+    double r_ft_R[4];    ///< Absolute F/T rotation
 
     struct pir_state state;
     struct timespec now;
 
-    double Tee[12];
-    double T0[12];
+    double See[8];
+    double S0[8];
 
     sig_atomic_t rebias;
 } cx_t;
@@ -99,8 +99,8 @@ int main( int argc, char **argv ) {
 
     assert( aa_tf_isrotmat( tf_0 ) );
 
-    AA_MEM_CPY( cx.Tee, tf_ident, 12 );
-    AA_MEM_CPY( cx.T0, tf_0, 12 );
+    aa_tf_tfmat2duqu( tf_ident, cx.See );
+    aa_tf_tfmat2duqu( tf_0, cx.S0 );
 
 
     /*-- args --*/
@@ -136,10 +136,16 @@ int main( int argc, char **argv ) {
                          0, 0, 1,
                          1, 0, 0 };
         assert(aa_tf_isrotmat(R0));
+        double r0[4];
+        aa_tf_rotmat2quat(R0, r0);
 
-        double Rrot[9];
-        aa_tf_zangle2rotmat(15*M_PI/180, Rrot);
-        aa_tf_9mul( R0, Rrot, cx.R_ft_rel );
+        //double Rrot[9];
+        //aa_tf_zangle2rotmat(15*M_PI/180, Rrot);
+        //aa_tf_9mul( R0, Rrot, cx.R_ft_rel );
+
+        double r_rel[4];
+        aa_tf_zangle2quat(15*M_PI/180, r_rel);
+        aa_tf_qmul( r0, r_rel, cx.r_ft_rel );
     }
 
 
@@ -243,10 +249,10 @@ static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
     return 0;
 }
 
-static void rotate_ft( const double *R_ft, const double *F_raw, double *F ) {
+static void rotate_ft( const double r_ft[4], const double *F_raw, double *F ) {
     // rotate
-    aa_tf_9rot( R_ft, F_raw,   F);
-    aa_tf_9rot( R_ft, F_raw+3, F+3 );
+    aa_tf_qrot( r_ft, F_raw,   F);
+    aa_tf_qrot( r_ft, F_raw+3, F+3 );
 
     // subtract end-effector mass
     F[2] += PIR_FT_WEIGHT;
@@ -272,22 +278,19 @@ static void update(void) {
     int u_fr = update_ft( cx.F_raw_R, &cx.chan_ft_right, &timeout );
 
     // update kinematics
-    double T_L[12], T_R[12];
     if( u_l ) {
-        lwa4_kin_( &cx.state.q[PIR_AXIS_L0], cx.T0, cx.Tee,
-                   T_L, cx.state.J_L );
-        aa_tf_9mul( T_L, cx.R_ft_rel, cx.R_ft_L );
-        aa_tf_tfmat2duqu( T_L, cx.state.S_L );
+        lwa4_kin_duqu( &cx.state.q[PIR_AXIS_L0], cx.S0, cx.See,
+                       cx.state.S_L, cx.state.J_L  );
+        aa_tf_qmul( cx.state.S_L, cx.r_ft_rel, cx.r_ft_L );
     }
     if( u_r ) {
-        lwa4_kin_( &cx.state.q[PIR_AXIS_R0], cx.T0, cx.Tee,
-                   T_R, cx.state.J_R );
-        aa_tf_9mul( T_R, cx.R_ft_rel, cx.R_ft_R );
-        aa_tf_tfmat2duqu( T_R, cx.state.S_R );
+        lwa4_kin_duqu( &cx.state.q[PIR_AXIS_R0], cx.S0, cx.See,
+                       cx.state.S_R, cx.state.J_R  );
+        aa_tf_qmul( cx.state.S_R, cx.r_ft_rel, cx.r_ft_R );
     }
 
-    if( u_l || u_fl ) rotate_ft( cx.R_ft_L, cx.F_raw_L, cx.state.F_L );
-    if( u_r || u_fr ) rotate_ft( cx.R_ft_R, cx.F_raw_R, cx.state.F_R );
+    if( u_l || u_fl ) rotate_ft( cx.r_ft_L, cx.F_raw_L, cx.state.F_L );
+    if( u_r || u_fr ) rotate_ft( cx.r_ft_R, cx.F_raw_R, cx.state.F_R );
 
 
 
@@ -321,10 +324,11 @@ static int bias_ft( void ) {
 
     // Rotate force to F/T frame
     // F_abs = R_ft * F_ft  => R_ft^T * F_abs = F_ft
-    double R_ft_T[9];
-    aa_la_transpose2( 3, 3, cx.R_ft_L, R_ft_T );
-    aa_tf_9rot( R_ft_T, F, msg->x );
-    aa_tf_9rot( R_ft_T, F+3, msg->x+3 );
+
+    double r_ft_inv[4];
+    aa_tf_qconj(cx.r_ft_L, r_ft_inv);
+    aa_tf_qrot( r_ft_inv, F, msg->x );
+    aa_tf_qrot( r_ft_inv, F+3, msg->x+3 );
 
     // send message
     ach_status_t r = ach_put( &cx.chan_ftbias_left, msg, n_msg );
