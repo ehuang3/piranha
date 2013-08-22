@@ -101,6 +101,13 @@ int set_mode_k_q(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     }
     return 0;
 }
+int set_mode_k_f(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    if(  msg_ctrl->n == 1 ) {
+        printf("k_f: %f\n", msg_ctrl->x[0].f );
+        AA_MEM_SET( cx->Kx.f, msg_ctrl->x[0].f, 3 );
+    }
+    return 0;
+}
 
 int set_mode_cpy(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     printf("ctrl: %s\n", msg_ctrl->mode );

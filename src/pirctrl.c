@@ -126,6 +126,9 @@ struct pir_mode_desc mode_desc[] = {
     {"k-pr",
      set_mode_k_pr,
      NULL},
+    {"k-f",
+     set_mode_k_f,
+     NULL},
     {NULL, NULL, NULL} };
 
 
@@ -189,6 +192,7 @@ int main( int argc, char **argv ) {
         cx.G_L.x_min[i] = -10;
         cx.G_L.x_max[i] = 10;
     }
+    cx.G_L.F_max = 20;
     // right
     cx.G_R.n_q = 7;
     cx.G_R.J =  cx.state.J_R;
@@ -208,6 +212,7 @@ int main( int argc, char **argv ) {
         cx.G_R.x_min[i] = -10;
         cx.G_R.x_max[i] = 10;
     }
+    cx.G_R.F_max = 20;
 
     rfx_ctrl_ws_lin_k_init( &cx.Kx, 7 );
     aa_fset( cx.Kx.q, 0.1, 7 );
@@ -215,8 +220,8 @@ int main( int argc, char **argv ) {
     cx.Kx.q[3] *= 5; // lower limits
     cx.Kx.q[5] *= 5; // lower limits
     cx.Kx.q[6] *= 5; // this module is most sensitive to limits
-    //aa_fset( cx.K.f, -.003, 6 );
-    aa_fset( cx.Kx.f, -.000, 6 );
+    aa_fset( cx.Kx.f, .003, 6 );
+    //aa_fset( cx.Kx.f, -.000, 6 );
     aa_fset( cx.Kx.p, 1.0, 3 );
     aa_fset( cx.Kx.p+3, 1.0, 3 );
     /* aa_fset( cx.K.p, 0.0, 3 ); */

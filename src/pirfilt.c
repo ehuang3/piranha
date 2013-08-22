@@ -231,7 +231,7 @@ static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
             frame_size == sns_msg_vector_size_n(6) )
         {
             for( size_t i = 0; i < 6; i++ ) {
-                F[i] = msg->x[i];
+                F[i] = -msg->x[i];
             }
             return 1;
         } else {
@@ -255,7 +255,7 @@ static void rotate_ft( const double r_ft[4], const double *F_raw, double *F ) {
     aa_tf_qrot( r_ft, F_raw+3, F+3 );
 
     // subtract end-effector mass
-    F[2] += PIR_FT_WEIGHT;
+    F[2] -= PIR_FT_WEIGHT;
 
     // TODO: torque
 }

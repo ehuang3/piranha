@@ -161,6 +161,7 @@ int set_mode_k_s2min(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_k_pt(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_k_pr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_k_q(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_k_f(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_cpy(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
