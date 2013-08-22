@@ -59,7 +59,7 @@ int main(void) {
     aa_tick("numeric-chain: ");
     for( size_t i = 0; i < N; i ++ ) {
         rfx_kin_tf_chain( 7, aa_tf_ident, T_rel, T_abs );
-        aa_tf_12chain( T_abs+6*7, aa_tf_ident, Te );
+        aa_tf_12chain( T_abs+6*12, aa_tf_ident, Te );
     }
     aa_tock();
 
@@ -75,6 +75,36 @@ int main(void) {
     aa_dump_mat(stdout, Te, 3, 4);
     printf("\n");
 
+    double S_rel[8*7];
+    double S_abs[8*7];
+    double Se[8];
+
+    aa_tick("duqu-rel: ");
+    for( size_t i = 0; i < N; i ++ )
+        lwa4_duqu( q, S_rel );
+    aa_tock();
+
+    aa_tick("duqu-chain: ");
+    for( size_t i = 0; i < N; i ++ ) {
+        rfx_kin_duqu_chain( 7, aa_tf_duqu_ident, S_rel, S_abs );
+        aa_tf_duqu_mul( T_abs+6*8, aa_tf_duqu_ident, Se );
+    }
+    aa_tock();
+
+    aa_tick("duqu-jac: ");
+    for( size_t i = 0; i < N; i ++ )
+        rfx_kin_duqu_jac_rev( 7, S_abs, axis[0], Se, J, 6 );
+    aa_tock();
+
+
+    aa_tick("duqu-all: ");
+    for( size_t i = 0; i < N; i ++ )
+        lwa4_kin_duqu( q, aa_tf_duqu_ident, aa_tf_duqu_ident, Se, J );
+    aa_tock();
+    aa_tf_duqu_minimize(Se );
+    aa_tf_duqu2tfmat(Se, Te);
+    aa_dump_mat(stdout, Te, 3, 4);
+    printf("\n");
 
     /* printf("\n\n"); */
     /* aa_dump_mat(stdout, J, 6, 7); */
