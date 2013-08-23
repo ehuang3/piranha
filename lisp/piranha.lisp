@@ -220,3 +220,17 @@
           (aref v 5) (* pi (coerce q5 'double-float))
           (aref v 6) (* pi (coerce q6 'double-float)))
   (pir-message "sdh-set" v)))
+
+
+(defparameter *q-start*
+  (aa::vec (* .3 pi) (* -.25 pi) (* -.25 pi) (* -.25 pi) (* -.25 pi) (* .35 pi) 0))
+
+(defparameter *q-store*
+  (aa::vec (* .5 pi) (* -.25 pi) (* 0 pi) (* -.25 pi) (* -.25 pi) 0 0))
+
+(defun pir-start ()
+       (pir-set (aa::vec 0 0 0 0 0 0 0))
+       (sleep 10.5)
+       (pir-set (aa::vec (* .5 pi) 0 0 0 0 0 0) :time 4d0)
+       (sleep 4.5)
+       (pir-set (aa::vec (* .3 pi) (* -.25 pi) (* -.25 pi) (* -.25 pi) (* -.25 pi) (* .35 pi) 0)))
