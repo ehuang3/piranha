@@ -98,9 +98,9 @@ pir_start() {
         can402 -f $CAN_R -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-right -s state-right
 
     $SNS run -d -r ft-left -- \
-        cftd -f $CAN_L -n 27 -c ft-left -b ft-bias-left -W 1e5
+        cftd -f $CAN_L -n 27 -c ft-left -b ft-bias-left -W 1e6
     $SNS run -d -r ft-right -- \
-        cftd -f $CAN_R -n 27 -c ft-right -b ft-bias-right -W 1e5
+        cftd -f $CAN_R -n 27 -c ft-right -b ft-bias-right -W 1e6
 
     $SNS run -d -r sdh-left -- \
         sdhiod -b $CAN_SDH_L -c sdhref-left -s sdhstate-left

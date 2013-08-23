@@ -228,7 +228,8 @@ int main( int argc, char **argv ) {
     cx.Kx.q[3] *= 5; // lower limits
     cx.Kx.q[5] *= 5; // lower limits
     cx.Kx.q[6] *= 5; // this module is most sensitive to limits
-    aa_fset( cx.Kx.f, .003, 6 );
+    aa_fset( cx.Kx.f, .003, 3 );
+    aa_fset( cx.Kx.f+3, .000, 3 );
     //aa_fset( cx.Kx.f, -.000, 6 );
     aa_fset( cx.Kx.p, 1.0, 3 );
     aa_fset( cx.Kx.p+3, 1.0, 3 );
