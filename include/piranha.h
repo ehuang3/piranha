@@ -135,6 +135,10 @@ typedef struct {
     ach_channel_t chan_ref_right;
     ach_channel_t chan_state_pir;
     ach_channel_t chan_ctrl;
+
+    ach_channel_t chan_sdhref_left;
+    ach_channel_t chan_sdhref_right;
+
     double dt;
 
     struct sns_msg_motor_ref *msg_ref;
@@ -185,5 +189,8 @@ int set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+
+
+int sdh_zero( pirctrl_cx_t *cx, struct pir_msg * );
 
 #endif //PIRANHA_H

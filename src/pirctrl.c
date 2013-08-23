@@ -120,6 +120,9 @@ struct pir_mode_desc mode_desc[] = {
     {"trajq",
      set_mode_trajq,
      ctrl_trajq},
+    {"sdh-zero",
+     sdh_zero,
+     NULL},
     {"k-pt",
      set_mode_k_pt,
      NULL},
@@ -155,6 +158,8 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_ref_torso,   "ref-torso",   NULL );
     sns_chan_open( &cx.chan_ref_left,    "ref-left",    NULL );
     sns_chan_open( &cx.chan_ref_right,   "ref-right",   NULL );
+    sns_chan_open( &cx.chan_sdhref_left,    "sdhref-left",    NULL );
+    sns_chan_open( &cx.chan_sdhref_right,   "sdhref-right",   NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",   NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_pir, &cx.chan_js, NULL};
