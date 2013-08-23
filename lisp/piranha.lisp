@@ -205,3 +205,18 @@
     (setf (aref vec 0) time)
     (replace vec q :start1 1)
     (pir-message "trajq" vec)))
+
+(defun pir-sdh-set (q)
+  (check-type q (simple-array double-float (7)))
+  (pir-message "sdh-set" q))
+
+(defun pir-sdh-set-pi (q0 q1 q2 q3 q4 q5 q6)
+  (let ((v (make-array 7 :element-type 'double-float)))
+    (setf (aref v 0) (* pi (coerce q0 'double-float))
+          (aref v 1) (* pi (coerce q1 'double-float))
+          (aref v 2) (* pi (coerce q2 'double-float))
+          (aref v 3) (* pi (coerce q3 'double-float))
+          (aref v 4) (* pi (coerce q4 'double-float))
+          (aref v 5) (* pi (coerce q5 'double-float))
+          (aref v 6) (* pi (coerce q6 'double-float)))
+  (pir-message "sdh-set" v)))

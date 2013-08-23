@@ -192,5 +192,6 @@ int set_mode_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 
 
 int sdh_zero( pirctrl_cx_t *cx, struct pir_msg * );
+int sdh_set( pirctrl_cx_t *cx, struct pir_msg * );
 
 #endif //PIRANHA_H
