@@ -51,22 +51,42 @@
 #define PIR_FT_WEIGHT 4
 
 enum pir_axis {
-    PIR_AXIS_T  =   0,
-    PIR_AXIS_L0 =   1,
-    PIR_AXIS_L1 =   2,
-    PIR_AXIS_L2 =   3,
-    PIR_AXIS_L3 =   4,
-    PIR_AXIS_L4 =   5,
-    PIR_AXIS_L5 =   6,
-    PIR_AXIS_L6 =   7,
-    PIR_AXIS_R0 =   8,
-    PIR_AXIS_R1 =   9,
-    PIR_AXIS_R2 =  10,
-    PIR_AXIS_R3 =  11,
-    PIR_AXIS_R4 =  12,
-    PIR_AXIS_R5 =  13,
-    PIR_AXIS_R6 =  14,
-    PIR_AXIS_CNT = 15
+
+    PIR_AXIS_T  =       0,
+
+    PIR_AXIS_L0 =       1,
+    PIR_AXIS_L1 =       2,
+    PIR_AXIS_L2 =       3,
+    PIR_AXIS_L3 =       4,
+    PIR_AXIS_L4 =       5,
+    PIR_AXIS_L5 =       6,
+    PIR_AXIS_L6 =       7,
+
+    PIR_AXIS_R0 =       8,
+    PIR_AXIS_R1 =       9,
+    PIR_AXIS_R2 =      10,
+    PIR_AXIS_R3 =      11,
+    PIR_AXIS_R4 =      12,
+    PIR_AXIS_R5 =      13,
+    PIR_AXIS_R6 =      14,
+
+    PIR_AXIS_SDH_L0 =  15,
+    PIR_AXIS_SDH_L1 =  16,
+    PIR_AXIS_SDH_L2 =  17,
+    PIR_AXIS_SDH_L3 =  18,
+    PIR_AXIS_SDH_L4 =  19,
+    PIR_AXIS_SDH_L5 =  20,
+    PIR_AXIS_SDH_L6 =  21,
+
+    PIR_AXIS_SDH_R0 =  22,
+    PIR_AXIS_SDH_R1 =  23,
+    PIR_AXIS_SDH_R2 =  24,
+    PIR_AXIS_SDH_R3 =  25,
+    PIR_AXIS_SDH_R4 =  26,
+    PIR_AXIS_SDH_R5 =  27,
+    PIR_AXIS_SDH_R6 =  28,
+
+    PIR_AXIS_CNT =     29
 };
 
 // TODO: all transforms, jacobians, forces, in global frame
@@ -77,9 +97,6 @@ struct pir_state {
 
     double F_L[6];
     double F_R[6];
-
-    //double Tee[12];
-    //double T0[12];
 
     double S_L[8];
     double S_R[8];

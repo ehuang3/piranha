@@ -64,6 +64,8 @@ typedef struct {
     ach_channel_t chan_ftbias_left;
     ach_channel_t chan_ftbias_right;
     ach_channel_t chan_state_pir;
+    ach_channel_t chan_sdhstate_left;
+    ach_channel_t chan_sdhstate_right;
 
 
     double F_raw_L[6]; ///< raw F/T reading, left
@@ -119,11 +121,14 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_state_torso, "state-torso", NULL );
     sns_chan_open( &cx.chan_state_left,  "state-left",  NULL );
     sns_chan_open( &cx.chan_state_right, "state-right", NULL );
+    sns_chan_open( &cx.chan_sdhstate_left,  "sdhstate-left",  NULL );
+    sns_chan_open( &cx.chan_sdhstate_right, "sdhstate-right", NULL );
     sns_chan_open( &cx.chan_ft_left,      "ft-left",  NULL );
     sns_chan_open( &cx.chan_ft_right,     "ft-right", NULL );
     sns_chan_open( &cx.chan_ftbias_left,  "ft-bias-left",  NULL );
     sns_chan_open( &cx.chan_ftbias_right, "ft-bias-right", NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",  NULL );
+
     {
         ach_channel_t *chans[] = {&cx.chan_state_left, &cx.chan_state_torso, NULL};
         sns_sigcancel( chans, sns_sig_term_default );
@@ -272,6 +277,11 @@ static void update(void) {
     int u_l = update_n(7, PIR_AXIS_L0, &cx.chan_state_left, &timeout);
     int u_r = update_n(7, PIR_AXIS_R0, &cx.chan_state_right, &timeout);
     is_updated = is_updated || u_l || u_r;
+
+    int u_sl = update_n(7, PIR_AXIS_SDH_L0, &cx.chan_sdhstate_left, &timeout);
+    int u_sr = update_n(7, PIR_AXIS_SDH_R0, &cx.chan_sdhstate_right, &timeout);
+
+    is_updated = is_updated || u_sl || u_sr;
 
     // force-torque
     int u_fl = update_ft( cx.F_raw_L, &cx.chan_ft_left, &timeout );

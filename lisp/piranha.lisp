@@ -65,8 +65,8 @@
 
 
 (cffi:defcstruct pir-cstate
-  (q :double :count 15)
-  (dq :double :count 15)
+  (q :double :count 29)
+  (dq :double :count 29)
 
   (f-l :double :count 6)
   (f-r :double :count 6)
@@ -86,7 +86,9 @@
   r-l       ; left rotion quaternion
   r-r       ; right rotion quaternion
   x-l       ; left translation vector
-  x-r       ; righ5 translation vector
+  x-r       ; right translation vector
+  f-l
+  f-r
   )
 
 
@@ -109,8 +111,10 @@
         (multiple-value-bind (r-l x-l) (amino::tf-duqu2qv s-l)
           (multiple-value-bind (r-r x-r) (amino::tf-duqu2qv s-r)
             (make-pir-state
-             :q (extract 'q 15)
-             :dq (extract 'dq 15)
+             :q (extract 'q 29)
+             :dq (extract 'dq 29)
+             :f-l (extract 'f-l 6)
+             :f-r (extract 'f-r 6)
              :s-l s-l
              :s-r s-r
              :r-l r-l
