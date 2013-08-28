@@ -50,6 +50,14 @@
 
 #define PIR_FT_WEIGHT 4
 
+#define PIR_SDH_AXIAL 0
+#define PIR_SDH_L0    1
+#define PIR_SDH_L1    2
+#define PIR_SDH_T0    3
+#define PIR_SDH_T1    4
+#define PIR_SDH_R0    5
+#define PIR_SDH_R1    6
+
 enum pir_axis {
 
     PIR_AXIS_T  =       0,
@@ -193,5 +201,6 @@ int set_mode_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 
 int sdh_zero( pirctrl_cx_t *cx, struct pir_msg * );
 int sdh_set( pirctrl_cx_t *cx, struct pir_msg * );
+int sdh_pinch( pirctrl_cx_t *cx, struct pir_msg * );
 
 #endif //PIRANHA_H

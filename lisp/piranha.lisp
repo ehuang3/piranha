@@ -233,4 +233,4 @@
        (sleep 10.5)
        (pir-set (aa::vec (* .5 pi) 0 0 0 0 0 0) :time 4d0)
        (sleep 4.5)
-       (pir-set (aa::vec (* .3 pi) (* -.25 pi) (* -.25 pi) (* -.25 pi) (* -.25 pi) (* .35 pi) 0)))
+       (pir-set *q-start*))
