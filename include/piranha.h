@@ -123,6 +123,10 @@ void lwa4_kin2_( const double *q, const double *T0, const double *Tee, double *T
 void lwa4_kin_duqu( const double *q, const double S0[8], const double Tee[8], double T[8], double *J );
 void lwa4_duqu( const double *q, double *S_rel );
 
+
+int pir_kin_solve( double q0[7], double S1[8], double q1[7] );
+
+
 struct pir_msg {
     char mode[64];
     uint64_t n;
