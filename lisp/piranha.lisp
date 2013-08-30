@@ -99,13 +99,12 @@
             (mem-aref pointer :double i)))
     x))
 
-
 (defun get-state ()
-  (with-foreign-object (state 'pir-cstate)
-    (ach:get-pointer *state-channel* state (foreign-type-size 'pir-cstate)
+  (with-foreign-object (state '(:struct pir-cstate))
+    (ach:get-pointer *state-channel* state (foreign-type-size '(:struct pir-cstate))
                      :wait t :last t)
     (labels ((extract (x n)
-               (read-doubles (foreign-slot-pointer state 'pir-cstate x) n)))
+               (read-doubles (foreign-slot-pointer state '(:struct pir-cstate) x) n)))
       (let ((s-l (extract 's-l 8))
             (s-r (extract 's-r 8)))
         (multiple-value-bind (r-l x-l) (amino::tf-duqu2qv s-l)
