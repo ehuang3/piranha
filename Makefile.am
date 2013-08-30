@@ -14,7 +14,6 @@ pirctrl_LDADD = -lsns -lach  -lreflex -lamino -lblas -llapack
 lib_LTLIBRARIES = libpiranha.la
 
 libpiranha_la_SOURCES =                  \
-	kinematics.f                     \
 	tf.f                             \
 	src/lwa4.c
 

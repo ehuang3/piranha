@@ -27,3 +27,11 @@
 /ltmain.sh
 /libtool
 /kinematics.s
+*.gnuplot
+/pirdump
+/ctrl.pid
+/ctrl.ppid
+/config.guess
+/config.sub
+/core
+/out

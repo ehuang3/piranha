@@ -32,12 +32,12 @@ int main(void) {
     aa_tick("null: ");
     aa_tock();
 
-    aa_tick("symbolic: ");
-    for( size_t i = 0; i < N; i ++ )
-        lwa4_kin_( q, aa_tf_ident, aa_tf_ident, Te, J );
-    aa_tock();
-    aa_dump_mat(stdout, Te, 3, 4);
-    printf("\n");
+    /* aa_tick("symbolic: "); */
+    /* for( size_t i = 0; i < N; i ++ ) */
+    /*     lwa4_kin_( q, aa_tf_ident, aa_tf_ident, Te, J ); */
+    /* aa_tock(); */
+    /* aa_dump_mat(stdout, Te, 3, 4); */
+    /* printf("\n"); */
 
     /* aa_tick("tf abs: "); */
     /* for( size_t i = 0; i < N; i ++ ) */

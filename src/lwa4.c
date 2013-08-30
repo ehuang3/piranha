@@ -46,12 +46,11 @@ void lwa4_kin_duqu( const double *q, const double S0[8], const double See[8], do
 
     double S_abs[8*7];
     if( J ) {
-        rfx_kin_duqu_revchain( 7, S0, S_rel, See, axis[0], S_abs, J, 6 );
-        AA_MEM_CPY( S, S_abs+8*6, 8 );
+        rfx_kin_duqu_revchain( 7, S0, S_rel, See, axis[0], S_abs, S, J, 6 );
     } else {
+
         rfx_kin_duqu_chain( 7, S0, S_rel, S_abs );
-        AA_MEM_CPY( S, S_abs+8*6, 8 );
-        //aa_tf_duqu_mul( S_abs+8*6, See, S );
+        aa_tf_duqu_mul( S_abs+8*6, See, S );
     }
 }
 

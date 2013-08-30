@@ -58,6 +58,24 @@
 #define PIR_SDH_R0    5
 #define PIR_SDH_R1    6
 
+
+// TODO: subtract inseration depth of tool changer
+#define LWA4_FT_L 82.2e-3 ///< Length of F/T Sensor
+
+#define LWA4_FT_ANGLE (45*M_PI/180)
+
+// TODO: Adjust for new tool changer
+
+#define SDH_L0 98e-3      ///< Base connector to finger joint
+#define SDH_L1 0.0865     ///< Lower finger joint
+#define SDH_L2 0.0675     ///< Upper finger joint
+#define SDH_B 66e-3       ///< distance between fingers
+#define SDH_TC 38.105e-3  ///< Thumb to center point
+#define SDH_FC 19.053e-3  ///< Fingers line to center point
+
+#define SDH_MASS 1.955                    ///< SDH Mass (kilograms)
+#define SDH_WEIGHT (SDH_MASS*AA_K_STD_G)  ///< SDH Weight (Newton)
+
 enum pir_axis {
 
     PIR_AXIS_T  =       0,

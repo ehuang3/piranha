@@ -81,6 +81,10 @@
 (defstruct pir-state
   q         ; joint angles
   dq        ; joint velocities
+  q-l       ; left joints
+  q-r       ; right joints
+  q-sdh-l   ; left sdh joints
+  q-sdh-r   ; left sdh joints
   s-l       ; left pose quaternion
   s-r       ; right pose quaternion
   r-l       ; left rotion quaternion
@@ -106,12 +110,17 @@
     (labels ((extract (x n)
                (read-doubles (foreign-slot-pointer state '(:struct pir-cstate) x) n)))
       (let ((s-l (extract 's-l 8))
-            (s-r (extract 's-r 8)))
+            (s-r (extract 's-r 8))
+            (q (extract 'q 29)))
         (multiple-value-bind (r-l x-l) (amino::tf-duqu2qv s-l)
           (multiple-value-bind (r-r x-r) (amino::tf-duqu2qv s-r)
             (make-pir-state
-             :q (extract 'q 29)
+             :q q
              :dq (extract 'dq 29)
+             :q-l (amino::vec-copy q :start 1 :end 8)
+             :q-r (amino::vec-copy q :start 8 :end 15)
+             :q-sdh-l (amino::vec-copy q :start 15 :end 22)
+             :q-sdh-r (amino::vec-copy q :start 22 :end 28)
              :f-l (extract 'f-l 6)
              :f-r (extract 'f-r 6)
              :s-l s-l
@@ -121,12 +130,10 @@
              :x-l x-l
              :x-r x-r)))))))
 
-
-
 (defun pir-set-mode (msg mode)
   (assert (< (length mode) 63))
   (labels ((setit (i val)
-             (setf (mem-aref (foreign-slot-pointer msg 'pir-message 'type)
+             (setf (mem-aref (foreign-slot-pointer msg '(:struct pir-message) 'type)
                              :char i)
                    val)))
 
@@ -135,14 +142,14 @@
     (setit (length mode) 0)))
 
 (defun pir-message (mode &optional data)
-  (with-foreign-pointer (msg (+ (foreign-type-size 'pir-message)
+  (with-foreign-pointer (msg (+ (foreign-type-size '(:struct pir-message))
                                 (* 8 (length data)))
                              msg-size)
     (pir-set-mode msg mode)
-    (setf (foreign-slot-value msg 'pir-message 'n)
+    (setf (foreign-slot-value msg '(:struct pir-message) 'n)
           (length data))
     (dotimes (i (length data))
-      (let ((pointer (inc-pointer (foreign-slot-pointer msg 'pir-message 'n)
+      (let ((pointer (inc-pointer (foreign-slot-pointer msg '(:struct pir-message) 'n)
                                   (* 8 (1+ i))))
             (x (elt data i)))
         (etypecase x
@@ -233,3 +240,6 @@
        (pir-set (aa::vec (* .5 pi) 0 0 0 0 0 0) :time 4d0)
        (sleep 4.5)
        (pir-set *q-start*))
+
+(defun pir-pinch (y r)
+  (pir-message "pinch" (aa::vec r y)))

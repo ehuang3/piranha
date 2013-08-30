@@ -149,7 +149,7 @@ int main( int argc, char **argv ) {
         //aa_tf_9mul( R0, Rrot, cx.R_ft_rel );
 
         double r_rel[4];
-        aa_tf_zangle2quat(15*M_PI/180, r_rel);
+        aa_tf_zangle2quat(LWA4_FT_ANGLE, r_rel);
         aa_tf_qmul( r0, r_rel, cx.r_ft_rel );
     }
 
@@ -220,6 +220,26 @@ static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts
     return 0;
 }
 
+static int update_sdh() {
+    // TODO: which direction is finger line?
+    double y1, y2;
+    rfx_kin_2d2_fk( SDH_L0, SDH_L0,
+                    cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L0],
+                    cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L1],
+                    NULL,
+                    &y1 );
+    rfx_kin_2d2_fk( SDH_L0, SDH_L0,
+                    cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R0],
+                    cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R1],
+                    NULL,
+                    &y2 );
+    // add F/T, SDH, Fingers to S_ee
+    double v[3] = { LWA4_FT_L + SDH_L0 + (y1+y2/2), 0, SDH_FC};
+    aa_tf_qv2duqu( aa_tf_quat_ident, v, cx.See );
+
+    return 0;
+}
+
 static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
     size_t frame_size;
     void *buf = NULL;
@@ -260,7 +280,7 @@ static void rotate_ft( const double r_ft[4], const double *F_raw, double *F ) {
     aa_tf_qrot( r_ft, F_raw+3, F+3 );
 
     // subtract end-effector mass
-    F[2] -= PIR_FT_WEIGHT;
+    F[2] = F[2] - PIR_FT_WEIGHT - SDH_WEIGHT;
 
     // TODO: torque
 }
@@ -287,8 +307,13 @@ static void update(void) {
     int u_fl = update_ft( cx.F_raw_L, &cx.chan_ft_left, &timeout );
     int u_fr = update_ft( cx.F_raw_R, &cx.chan_ft_right, &timeout );
 
+    if( u_sl ) {
+        update_sdh();
+        // TODO: right hand
+    }
+
     // update kinematics
-    if( u_l ) {
+    if( u_l || u_sl ) {
         lwa4_kin_duqu( &cx.state.q[PIR_AXIS_L0], cx.S0, cx.See,
                        cx.state.S_L, cx.state.J_L  );
         aa_tf_qmul( cx.state.S_L, cx.r_ft_rel, cx.r_ft_L );
@@ -301,7 +326,6 @@ static void update(void) {
 
     if( u_l || u_fl ) rotate_ft( cx.r_ft_L, cx.F_raw_L, cx.state.F_L );
     if( u_r || u_fr ) rotate_ft( cx.r_ft_R, cx.F_raw_R, cx.state.F_R );
-
 
 
     //if( u_l || u_fl ) aa_dump_vec( stdout, cx.state.F_L, 3 );
@@ -321,6 +345,9 @@ static void update(void) {
 
 
 static int bias_ft( void ) {
+
+    SNS_LOG( LOG_NOTICE, "Re-biasing F/T\n");
+
     // F = -weight * k
     size_t n_msg = sns_msg_vector_size_n(6);
     struct sns_msg_vector *msg = (struct sns_msg_vector*) alloca(n_msg);
@@ -330,7 +357,7 @@ static int bias_ft( void ) {
 
     // Expected force in absolute frame
     double F[6] = {0};
-    F[2] = - PIR_FT_WEIGHT;
+    F[2] = F[2] - PIR_FT_WEIGHT - SDH_WEIGHT;
 
     // Rotate force to F/T frame
     // F_abs = R_ft * F_ft  => R_ft^T * F_abs = F_ft
