@@ -71,15 +71,18 @@ typedef struct {
     double F_raw_L[6]; ///< raw F/T reading, left
     double F_raw_R[6]; ///< raw F/T reading, right
 
-    double r_ft_rel[4];    ///< Rotation from E.E. to F/T
+    double r_ft_rel[4];  ///< Rotation from E.E. to F/T
+    double S_eer_L[8];   ///< Relative End-effector TF
+    double S_eer_R[8];   ///< Relative End-effector TF
 
     double r_ft_L[4];    ///< Absolute F/T rotation
     double r_ft_R[4];    ///< Absolute F/T rotation
 
+
     struct pir_state state;
     struct timespec now;
 
-    double See[8];
+    //double See[8];
     double S0[8];
 
     sig_atomic_t rebias;
@@ -93,6 +96,8 @@ static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts
 static void sighandler_hup ( int sig );
 static int bias_ft( void );
 
+static int kinematics( void );
+
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
 static const double tf_0[] = {0,1,0, 0,0,-1, -1,0,0, 0,0,0};
 
@@ -101,7 +106,7 @@ int main( int argc, char **argv ) {
 
     assert( aa_tf_isrotmat( tf_0 ) );
 
-    aa_tf_tfmat2duqu( tf_ident, cx.See );
+    //aa_tf_tfmat2duqu( tf_ident, cx.See );
     aa_tf_tfmat2duqu( tf_0, cx.S0 );
 
 
@@ -220,25 +225,25 @@ static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts
     return 0;
 }
 
-static int update_sdh() {
-    // TODO: which direction is finger line?
-    double y1, y2;
-    rfx_kin_2d2_fk( SDH_L0, SDH_L0,
-                    cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L0],
-                    cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L1],
-                    NULL,
-                    &y1 );
-    rfx_kin_2d2_fk( SDH_L0, SDH_L0,
-                    cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R0],
-                    cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R1],
-                    NULL,
-                    &y2 );
-    // add F/T, SDH, Fingers to S_ee
-    double v[3] = { LWA4_FT_L + SDH_L0 + (y1+y2/2), 0, SDH_FC};
-    aa_tf_qv2duqu( aa_tf_quat_ident, v, cx.See );
+/* static int update_sdh() { */
+/*     // TODO: which direction is finger line? */
+/*     double y1, y2; */
+/*     rfx_kin_2d2_fk( SDH_L0, SDH_L0, */
+/*                     cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L0], */
+/*                     cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L1], */
+/*                     NULL, */
+/*                     &y1 ); */
+/*     rfx_kin_2d2_fk( SDH_L0, SDH_L0, */
+/*                     cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R0], */
+/*                     cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R1], */
+/*                     NULL, */
+/*                     &y2 ); */
+/*     // add F/T, SDH, Fingers to S_ee */
+/*     double v[3] = { LWA4_FT_L + SDH_L0 + (y1+y2/2), 0, SDH_FC}; */
+/*     aa_tf_qv2duqu( aa_tf_quat_ident, v, cx.See ); */
 
-    return 0;
-}
+/*     return 0; */
+/* } */
 
 static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
     size_t frame_size;
@@ -274,16 +279,16 @@ static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
     return 0;
 }
 
-static void rotate_ft( const double r_ft[4], const double *F_raw, double *F ) {
-    // rotate
-    aa_tf_qrot( r_ft, F_raw,   F);
-    aa_tf_qrot( r_ft, F_raw+3, F+3 );
+/* static void rotate_ft( const double r_ft[4], const double *F_raw, double *F ) { */
+/*     // rotate */
+/*     aa_tf_qrot( r_ft, F_raw,   F); */
+/*     aa_tf_qrot( r_ft, F_raw+3, F+3 ); */
 
-    // subtract end-effector mass
-    F[2] = F[2] - PIR_FT_WEIGHT - SDH_WEIGHT;
+/*     // subtract end-effector mass */
+/*     F[2] = F[2] - PIR_FT_WEIGHT - SDH_WEIGHT; */
 
-    // TODO: torque
-}
+/*     // TODO: torque */
+/* } */
 
 static void update(void) {
 
@@ -307,31 +312,35 @@ static void update(void) {
     int u_fl = update_ft( cx.F_raw_L, &cx.chan_ft_left, &timeout );
     int u_fr = update_ft( cx.F_raw_R, &cx.chan_ft_right, &timeout );
 
-    if( u_sl ) {
-        update_sdh();
-        // TODO: right hand
-    }
+
+    is_updated = is_updated || u_fl || u_fr;
+
+    /* if( u_sl ) { */
+    /*     update_sdh(); */
+    /*     // TODO: right hand */
+    /* } */
 
     // update kinematics
-    if( u_l || u_sl ) {
-        lwa4_kin_duqu( &cx.state.q[PIR_AXIS_L0], cx.S0, cx.See,
-                       cx.state.S_L, cx.state.J_L  );
-        aa_tf_qmul( cx.state.S_L, cx.r_ft_rel, cx.r_ft_L );
-    }
-    if( u_r ) {
-        lwa4_kin_duqu( &cx.state.q[PIR_AXIS_R0], cx.S0, cx.See,
-                       cx.state.S_R, cx.state.J_R  );
-        aa_tf_qmul( cx.state.S_R, cx.r_ft_rel, cx.r_ft_R );
-    }
+    /* if( u_l || u_sl ) { */
+    /*     lwa4_kin_duqu( &cx.state.q[PIR_AXIS_L0], cx.S0, cx.See, */
+    /*                    cx.state.S_L, cx.state.J_L  ); */
+    /*     aa_tf_qmul( cx.state.S_L, cx.r_ft_rel, cx.r_ft_L ); */
+    /* } */
+    /* if( u_r ) { */
+    /*     lwa4_kin_duqu( &cx.state.q[PIR_AXIS_R0], cx.S0, cx.See, */
+    /*                    cx.state.S_R, cx.state.J_R  ); */
+    /*     aa_tf_qmul( cx.state.S_R, cx.r_ft_rel, cx.r_ft_R ); */
+    /* } */
 
-    if( u_l || u_fl ) rotate_ft( cx.r_ft_L, cx.F_raw_L, cx.state.F_L );
-    if( u_r || u_fr ) rotate_ft( cx.r_ft_R, cx.F_raw_R, cx.state.F_R );
+    /* if( u_l || u_fl ) rotate_ft( cx.r_ft_L, cx.F_raw_L, cx.state.F_L ); */
+    /* if( u_r || u_fr ) rotate_ft( cx.r_ft_R, cx.F_raw_R, cx.state.F_R ); */
 
 
     //if( u_l || u_fl ) aa_dump_vec( stdout, cx.state.F_L, 3 );
 
-    // compute
     if( is_updated ) {
+        // compute kinematics
+        kinematics();
 
         // send
         ach_status_t r = ach_put( &cx.chan_state_pir, &cx.state,
@@ -343,6 +352,47 @@ static void update(void) {
     }
 }
 
+static int kinematics( void ) {
+    /*-- Hand --*/
+    {
+        double y1, y2;
+        rfx_kin_2d2_fk( SDH_L0, SDH_L0,
+                        cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L0],
+                        cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L1],
+                        NULL,
+                        &y1 );
+        rfx_kin_2d2_fk( SDH_L0, SDH_L0,
+                        cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R0],
+                        cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R1],
+                        NULL,
+                        &y2 );
+        // add F/T, SDH, Fingers to S_ee
+        /* double v[3] = { LWA4_FT_L + SDH_L0 + (y1+y2/2), 0, SDH_FC}; */
+        /* aa_tf_qv2duqu( aa_tf_quat_ident, v, cx.S_eer_L ); */
+        double x = SDH_FC / sqrt(2);
+        double s0[8], s1[8];
+        aa_tf_xxyz2duqu( -60 * M_PI/180, LWA4_FT_L + SDH_L0 + (y1+y2/2), 0, 0, s0 );
+        aa_tf_xxyz2duqu( 0, 0, 0, -SDH_FC, s1 );
+        aa_tf_duqu_mul( s0, s1, cx.S_eer_L );
+    }
+
+
+    /*-- Arm --*/
+    lwa4_kin_duqu( &cx.state.q[PIR_AXIS_L0], cx.S0, cx.S_eer_L,
+                   cx.state.S_L, cx.state.J_L  );
+
+    /*-- F/T --*/
+    double r_arm[4];
+    aa_tf_qmulc( cx.state.S_L, cx.S_eer_L, r_arm );
+    aa_tf_qmul( r_arm, cx.r_ft_rel, cx.r_ft_L );
+    // rotate
+    aa_tf_qrot( cx.r_ft_L, cx.F_raw_L,   cx.state.F_L);
+    aa_tf_qrot( cx.r_ft_L, cx.F_raw_L+3, cx.state.F_L+3 );
+    // subtract end-effector mass
+    cx.state.F_L[2] = cx.state.F_L[2] - PIR_FT_WEIGHT - SDH_WEIGHT;
+
+    return 0;
+}
 
 static int bias_ft( void ) {
 
