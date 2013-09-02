@@ -75,7 +75,12 @@
   (s-r :double :count 8)
 
   (j-l :double :count #.(* 7 6))
-  (j-r :double :count #.(* 7 6)))
+  (j-r :double :count #.(* 7 6))
+
+  (s-eer-l :double :count 8)
+  (s-eer-r :double :count 8)
+
+  )
 
 
 (defstruct pir-state
@@ -87,6 +92,10 @@
   q-sdh-r   ; left sdh joints
   s-l       ; left pose quaternion
   s-r       ; right pose quaternion
+  s-eer-l   ; left end-effector relative
+  s-eer-r   ; right end-effector relative
+  s-f-l     ; left finger
+  s-f-r     ; right finger
   r-l       ; left rotion quaternion
   r-r       ; right rotion quaternion
   x-l       ; left translation vector
@@ -111,6 +120,8 @@
                (read-doubles (foreign-slot-pointer state '(:struct pir-cstate) x) n)))
       (let ((s-l (extract 's-l 8))
             (s-r (extract 's-r 8))
+            (s-eer-l (extract 's-eer-l 8))
+            (s-eer-r (extract 's-eer-r 8))
             (q (extract 'q 29)))
         (multiple-value-bind (r-l x-l) (amino::tf-duqu2qv s-l)
           (multiple-value-bind (r-r x-r) (amino::tf-duqu2qv s-r)
@@ -125,6 +136,10 @@
              :f-r (extract 'f-r 6)
              :s-l s-l
              :s-r s-r
+             :s-eer-l s-eer-l
+             :s-eer-r s-eer-r
+             :s-f-l (aa::tf-duqu-mul s-l s-eer-l)
+             :s-f-r (aa::tf-duqu-mul s-r s-eer-r)
              :r-l r-l
              :r-r r-r
              :x-l x-l
@@ -188,7 +203,7 @@
                    (r amino::+tf-quat-ident+))
   (let ((state (get-state)))
     (let* ((S-rel (amino::tf-qv2duqu r x))
-           (S-1 (amino::tf-duqu-mul (pir-state-s-l state) S-rel)))
+           (S-1 (amino::tf-duqu-mul (pir-state-s-f-l state) S-rel)))
       (pir-go (list (make-trajx-point :pose S-1
                                       :time time))
               :state state))))
@@ -200,7 +215,8 @@
 
 (defun pir-rotate (r &key (time 10d0))
   (let ((state (get-state)))
-    (pir-go (list (make-trajx-point :pose (amino::tf-qv2duqu r (pir-state-x-l state))
+    (pir-go (list (make-trajx-point :pose (amino::tf-qv2duqu r
+                                                             (aa::tf-duqu-trans (pir-state-s-f-l state)))
                                     :time time))
             :state state)))
 
@@ -229,10 +245,14 @@
 
 
 (defparameter *q-start*
-  (aa::vec (* .3 pi) (* -.25 pi) (* -.25 pi) (* -.25 pi) (* -.25 pi) (* .35 pi) 0))
+  (aa::vec (* .1 pi) (* -.3 pi) (* -.3 pi) (* -.3 pi) (* -.25 pi) (* .35 pi) (* .5 pi)))
+
 
 (defparameter *q-store*
   (aa::vec (* .5 pi) (* -.25 pi) (* 0 pi) (* -.25 pi) (* -.25 pi) 0 0))
+
+(defparameter *q-zero*
+  (aa::vec 0 0 0 0 0 0 0))
 
 (defun pir-go-start ()
        (pir-set (aa::vec 0 0 0 0 0 0 0))
@@ -243,3 +263,6 @@
 
 (defun pir-pinch (y r)
   (pir-message "pinch" (aa::vec r y)))
+
+(defun pir-zero (&optional (time 5d0))
+  (pir-set *q-zero* :time time))

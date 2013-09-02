@@ -369,22 +369,22 @@ static int kinematics( void ) {
         // add F/T, SDH, Fingers to S_ee
         /* double v[3] = { LWA4_FT_L + SDH_L0 + (y1+y2/2), 0, SDH_FC}; */
         /* aa_tf_qv2duqu( aa_tf_quat_ident, v, cx.S_eer_L ); */
-        double x = SDH_FC / sqrt(2);
         double s0[8], s1[8];
-        aa_tf_xxyz2duqu( -60 * M_PI/180, LWA4_FT_L + SDH_L0 + (y1+y2/2), 0, 0, s0 );
+        double x = LWA4_L_e + LWA4_FT_L + SDH_L0 + (y1+y2/2);
+        aa_tf_xxyz2duqu( -60 * M_PI/180, x, 0, 0, s0 );
         aa_tf_xxyz2duqu( 0, 0, 0, -SDH_FC, s1 );
-        aa_tf_duqu_mul( s0, s1, cx.S_eer_L );
+        aa_tf_duqu_mul( s0, s1, cx.state.S_eer_L );
     }
 
 
     /*-- Arm --*/
-    lwa4_kin_duqu( &cx.state.q[PIR_AXIS_L0], cx.S0, cx.S_eer_L,
-                   cx.state.S_L, cx.state.J_L  );
+    lwa4_kin_duqu( &cx.state.q[PIR_AXIS_L0], cx.S0, aa_tf_duqu_ident,
+                   cx.state.S_wp_L, cx.state.J_wp_L  );
 
     /*-- F/T --*/
-    double r_arm[4];
-    aa_tf_qmulc( cx.state.S_L, cx.S_eer_L, r_arm );
-    aa_tf_qmul( r_arm, cx.r_ft_rel, cx.r_ft_L );
+    //double r_arm[4];
+    //aa_tf_qmulc( cx.state.S_L, cx.S_eer_L, r_arm );
+    aa_tf_qmul( cx.state.S_wp_L, cx.r_ft_rel, cx.r_ft_L );
     // rotate
     aa_tf_qrot( cx.r_ft_L, cx.F_raw_L,   cx.state.F_L);
     aa_tf_qrot( cx.r_ft_L, cx.F_raw_L+3, cx.state.F_L+3 );

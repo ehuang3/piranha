@@ -55,11 +55,11 @@
 #include "piranha.h"
 
 static void zero_refs(pirctrl_cx_t *cx) {
-    AA_MEM_CPY( cx->G_L.ref.S, cx->state.S_L, 8 );
+    AA_MEM_CPY( cx->G_L.ref.S, cx->state.S_wp_L, 8 );
     AA_MEM_SET( cx->G_L.ref.q, 0, cx->G_L.n_q );
     AA_MEM_SET( cx->G_L.ref.dq, 0, cx->G_L.n_q );
 
-    AA_MEM_CPY( cx->G_R.ref.S, cx->state.S_R, 8 );
+    AA_MEM_CPY( cx->G_R.ref.S, cx->state.S_wp_R, 8 );
     AA_MEM_SET( cx->G_R.ref.q, 0, cx->G_R.n_q );
     AA_MEM_SET( cx->G_R.ref.dq, 0, cx->G_R.n_q );
 }
@@ -121,6 +121,14 @@ int set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     return 0;
 }
 
+
+int set_mode_ws_left_finger(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    zero_refs(cx);
+    aa_tf_duqu_smul( cx->state.S_wp_L, cx->state.S_eer_L, cx->G_L.ref.S );
+    set_mode_cpy(cx,msg_ctrl);
+    return 0;
+}
+
 int set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     zero_refs(cx);
     set_mode_cpy(cx,msg_ctrl);
@@ -155,17 +163,17 @@ int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     rfx_trajx_t *pT = (rfx_trajx_t*)T;
 
     // initial point
-    double r0[4], x0[3];
-    aa_tf_duqu2qv( cx->state.S_L, r0, x0 );
-    rfx_trajx_add( pT, 0, x0, r0 );
+    {
+        double S0[8];
+        aa_tf_duqu_mul( cx->state.S_wp_L, cx->state.S_eer_L, S0 );
+        rfx_trajx_add_duqu( pT, 0, S0 );
+    }
 
     // final point
     for( size_t i = 0; i + 9 <= msg_ctrl->n; i += 9 ) {
-        double r[4], x[3];
         double t = msg_ctrl->x[i].f;
         double *S = &msg_ctrl->x[i+1].f;
-        aa_tf_duqu2qv( S, r, x );
-        rfx_trajx_add( pT, t, x, r );
+        rfx_trajx_add_duqu( pT, t, S );
     }
 
     // generate

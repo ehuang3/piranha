@@ -64,6 +64,13 @@
 
 #define LWA4_FT_ANGLE (45*M_PI/180)
 
+
+#define LWA4_L_0 (0.3000) /* pedestal to shoulder */
+#define LWA4_L_1 (0.6280 - LWA4_L_0) /* shoulder to elbow */
+#define LWA4_L_2 (0.9510 - LWA4_L_1 - LWA4_L_0) /* elbow to wrist */
+#define LWA4_L_e (1.0334 - LWA4_L_2 - LWA4_L_1 - LWA4_L_0) /* wrist to E.E end of powerball */
+
+
 // TODO: Adjust for new tool changer
 
 #define SDH_L0 98e-3      ///< Base connector to finger joint
@@ -124,11 +131,14 @@ struct pir_state {
     double F_L[6];
     double F_R[6];
 
-    double S_L[8];
-    double S_R[8];
+    double S_wp_L[8];
+    double S_wp_R[8];
 
-    double J_L[7*6];
-    double J_R[7*6];
+    double J_wp_L[7*6];
+    double J_wp_R[7*6];
+
+    double S_eer_L[8];
+    double S_eer_R[8];
 };
 
 void lwa4_kin_( const double *q, const double *T0, const double *Tee, double *T, double *J );
@@ -215,6 +225,7 @@ int set_mode_k_q(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_k_f(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_cpy(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_ws_left_finger(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );

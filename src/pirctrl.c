@@ -76,6 +76,7 @@ static void ctrl_joint_left_wrist(void);
 static void ctrl_joint_right_shoulder(void);
 static void ctrl_joint_right_wrist(void);
 static void ctrl_ws_left(void);
+static void ctrl_ws_left_finger(void);
 static void ctrl_ws_right(void);
 static void ctrl_zero(void);
 static void ctrl_sin(void);
@@ -102,6 +103,9 @@ struct pir_mode_desc mode_desc[] = {
     {"ws-left",
      set_mode_ws_left,
      ctrl_ws_left},
+    {"ws-left-finger",
+     set_mode_ws_left_finger,
+     ctrl_ws_left_finger},
     {"ws-right",
      set_mode_ws_right,
      ctrl_ws_right},
@@ -186,10 +190,10 @@ int main( int argc, char **argv ) {
     }
     // left
     cx.G_L.n_q = 7;
-    cx.G_L.J =  cx.state.J_L;
+    cx.G_L.J =  cx.state.J_wp_L;
     cx.G_L.act.q =  &cx.state.q[PIR_AXIS_L0];
     cx.G_L.act.dq = &cx.state.dq[PIR_AXIS_L0];
-    cx.G_L.act.S = cx.state.S_L;
+    cx.G_L.act.S = cx.state.S_wp_L;
     cx.G_L.act.F = cx.state.F_L;
     cx.G_L.ref.q =  &cx.ref.q[PIR_AXIS_L0];
     cx.G_L.ref.dq = &cx.ref.dq[PIR_AXIS_L0];
@@ -206,10 +210,10 @@ int main( int argc, char **argv ) {
     cx.G_L.F_max = 20;
     // right
     cx.G_R.n_q = 7;
-    cx.G_R.J =  cx.state.J_R;
+    cx.G_R.J =  cx.state.J_wp_R;
     cx.G_R.act.q =  &cx.state.q[PIR_AXIS_R0];
     cx.G_R.act.dq = &cx.state.dq[PIR_AXIS_R0];
-    cx.G_R.act.S = cx.state.S_R;
+    cx.G_R.act.S = cx.state.S_wp_R;
     cx.G_R.act.F = cx.state.F_R;
     cx.G_R.ref.q =  &cx.ref.q[PIR_AXIS_R0];
     cx.G_R.ref.dq = &cx.ref.dq[PIR_AXIS_R0];
@@ -231,8 +235,8 @@ int main( int argc, char **argv ) {
     cx.Kx.q[3] *= 5; // lower limits
     cx.Kx.q[5] *= 5; // lower limits
     cx.Kx.q[6] *= 5; // this module is most sensitive to limits
-    aa_fset( cx.Kx.f, .003, 3 );
-    aa_fset( cx.Kx.f+3, .000, 3 );
+    //aa_fset( cx.Kx.f, .003, 3 );
+    //aa_fset( cx.Kx.f+3, .000, 3 );
     //aa_fset( cx.Kx.f, -.000, 6 );
     aa_fset( cx.Kx.p, 1.0, 3 );
     aa_fset( cx.Kx.p+3, 1.0, 3 );
@@ -434,29 +438,30 @@ static void ctrl_zero(void) {
 }
 
 
-static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G ) {
+static void ctrl_ws(size_t i, double S[8], double S_rel[8], rfx_ctrl_ws_t *G ) {
     // set refs
     AA_MEM_SET( G->ref.dx, 0, 6 );
+    double dx[6];
     if( cx.ref.user_button & GAMEPAD_BUTTON_RB ) {
-        G->ref.dx[3] = cx.ref.user[GAMEPAD_AXIS_LX] * .3;
-        G->ref.dx[4] = cx.ref.user[GAMEPAD_AXIS_LY] * .3;
-        G->ref.dx[5] = cx.ref.user[GAMEPAD_AXIS_RX] * .3;
+        dx[3] = cx.ref.user[GAMEPAD_AXIS_LX] * .3;
+        dx[4] = cx.ref.user[GAMEPAD_AXIS_LY] * .3;
+        dx[5] = cx.ref.user[GAMEPAD_AXIS_RX] * .3;
 
-        G->ref.dx[0] = cx.ref.user[GAMEPAD_AXIS_DX] * .02;
-        G->ref.dx[1] = cx.ref.user[GAMEPAD_AXIS_DY] * .02;
-        G->ref.dx[2] = cx.ref.user[GAMEPAD_AXIS_RY] * .1;
+        dx[0] = cx.ref.user[GAMEPAD_AXIS_DX] * .02;
+        dx[1] = cx.ref.user[GAMEPAD_AXIS_DY] * .02;
+        dx[2] = cx.ref.user[GAMEPAD_AXIS_RY] * .1;
     } else {
-        G->ref.dx[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .1;
-        G->ref.dx[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .1;
-        G->ref.dx[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .1;
+        dx[0] = cx.ref.user[GAMEPAD_AXIS_LX] * .1;
+        dx[1] = cx.ref.user[GAMEPAD_AXIS_LY] * .1;
+        dx[2] = cx.ref.user[GAMEPAD_AXIS_RX] * .1;
     }
+    if( S_rel ) {
+        double S_tmp[8];
+        rfx_kin_duqu_relvel( S, S_rel, dx, S_tmp, G->ref.dx );
+    } else {
+        memcpy( G->ref.dx, dx, sizeof(dx) );
 
-    //printf("--\n");
-    //printf("r0:   ");aa_dump_vec(stdout,  G->r, 4 );
-    //printf("x0:   ");aa_dump_vec(stdout,  G->x, 3 );
-    //printf("r_r0: ");aa_dump_vec(stdout,  G->r_r, 4 );
-    ////printf("x_r0: ");aa_dump_vec(stdout,  G->x_r, 3 );
-    //printf("dx_r: ");aa_dump_vec(stdout, G->dx_r, 6 );
+    }
 
     // compute stuff
     int r = rfx_ctrl_ws_lin_vfwd( G, &cx.Kx, &cx.ref.dq[i] );
@@ -464,21 +469,20 @@ static void ctrl_ws(size_t i, rfx_ctrl_ws_t *G ) {
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );
     }
-    //printf("dq:   ");aa_dump_vec(stdout, &cx.ref.dq[i], 7 );
-
     // integrate
     rfx_ctrl_ws_sdx( G, cx.dt );
-
-    //printf("r_r1: ");aa_dump_vec(stdout,  G->r_r, 4 );
-    //printf("x_r1: ");aa_dump_vec(stdout,  G->x_r, 3 );
 }
 
 static void ctrl_ws_left(void) {
-    ctrl_ws( PIR_AXIS_L0, &cx.G_L );
+    ctrl_ws( PIR_AXIS_L0, NULL, NULL, &cx.G_L );
 }
 
 static void ctrl_ws_right(void) {
-    ctrl_ws( PIR_AXIS_R0, &cx.G_R );
+    ctrl_ws( PIR_AXIS_R0,  NULL, NULL, &cx.G_R );
+}
+
+static void ctrl_ws_left_finger(void) {
+    ctrl_ws( PIR_AXIS_L0, cx.state.S_wp_L, cx.state.S_eer_L, &cx.G_L );
 }
 
 static void ctrl_sin(void) {
@@ -517,13 +521,22 @@ static void ctrl_trajx(void) {
 
 
     // get refs
+    double S_traj[8], dx[6] = {0};
+
     if( t >= cx.trajx->pt_f->t ) {
-        aa_tf_qv2duqu( cx.trajx->pt_f->r, cx.trajx->pt_f->x, cx.G_L.ref.S );
+        //aa_tf_qv2duqu( cx.trajx->pt_f->r, cx.trajx->pt_f->x, cx.G_L.ref.S );
+        aa_tf_qv2duqu( cx.trajx->pt_f->r, cx.trajx->pt_f->x, S_traj );
         AA_MEM_SET( cx.G_L.ref.dx, 0, 6 );
     } else {
-        rfx_trajx_get_x_duqu( cx.trajx, t, cx.G_L.ref.S );
-        rfx_trajx_get_dx( cx.trajx, t, cx.G_L.ref.dx );
+        rfx_trajx_get_x_duqu( cx.trajx, t, S_traj );
+        //rfx_trajx_get_dx( cx.trajx, t, cx.G_L.ref.dx );
+        rfx_trajx_get_dx( cx.trajx, t, dx );
     }
+
+    // convert to wrist frame
+    aa_tf_duqu_mulc( S_traj, cx.state.S_eer_L, cx.G_L.ref.S  );
+    double S_tmp[8];
+    rfx_kin_duqu_relvel( cx.G_L.ref.S, cx.state.S_eer_L, dx, S_tmp, cx.G_L.ref.dx );
 
 
     int r = rfx_ctrl_ws_lin_vfwd( &cx.G_L, &cx.Kx, &cx.ref.dq[PIR_AXIS_L0] );
