@@ -233,6 +233,10 @@
     (replace vec q :start1 1)
     (pir-message "trajq" vec)))
 
+
+(defun pir-torso (q &key (time 10d0))
+  (pir-message "trajq-torso" (aa::vec time q)))
+
 (defun pir-sdh-set (q)
   (check-type q (simple-array double-float (7)))
   (pir-message "sdh-set" q))

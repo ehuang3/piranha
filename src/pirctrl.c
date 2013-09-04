@@ -83,6 +83,7 @@ static void ctrl_sin(void);
 static void ctrl_step(void);
 static void ctrl_trajx(void);
 static void ctrl_trajq(void);
+static void ctrl_trajq_torso(void);
 
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
 
@@ -124,6 +125,9 @@ struct pir_mode_desc mode_desc[] = {
     {"trajq",
      set_mode_trajq,
      ctrl_trajq},
+    {"trajq-torso",
+     set_mode_trajq_torso,
+     ctrl_trajq_torso},
     {"sdh-zero",
      sdh_zero,
      NULL},
@@ -229,6 +233,29 @@ int main( int argc, char **argv ) {
     }
     cx.G_R.F_max = 20;
 
+    // torso
+    cx.G_T.n_q = 1;
+    cx.G_T.J =  NULL;
+    cx.G_T.act.q =  &cx.state.q[PIR_AXIS_T];
+    cx.G_T.act.dq = &cx.state.dq[PIR_AXIS_T];
+    cx.G_T.act.S = NULL;
+    cx.G_T.act.F = NULL;
+    cx.G_T.ref.q =  &cx.ref.q[PIR_AXIS_T];
+    cx.G_T.ref.dq = &cx.ref.dq[PIR_AXIS_T];
+    cx.G_T.q_min = &cx.q_min[PIR_AXIS_T];
+    cx.G_T.q_max = &cx.q_max[PIR_AXIS_T];
+    cx.G_T.ref.S = NULL;
+    cx.G_T.ref.F = NULL;
+    cx.G_T.ref.dx = NULL;
+    cx.G_T.act.dx = NULL;
+    for( size_t i = 0; i < 3; i ++ ) {
+        cx.G_T.x_min[i] = -10;
+        cx.G_T.x_max[i] = 10;
+    }
+    cx.G_T.F_max = 20;
+
+
+
     rfx_ctrl_ws_lin_k_init( &cx.Kx, 7 );
     aa_fset( cx.Kx.q, 0.1, 7 );
     cx.Kx.q[1] *= 5; // lower limits
@@ -251,6 +278,11 @@ int main( int argc, char **argv ) {
     cx.Kq.n_q = 7;
     cx.Kq.p = AA_NEW_AR( double, 7 );
     AA_MEM_SET( cx.Kq.p, 0, 7 );
+
+    cx.Kq_T.n_q = 1;
+    cx.Kq_T.p = AA_NEW_AR( double, 1 );
+    AA_MEM_SET( cx.Kq_T.p, 0, 1 );
+
     if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
         SNS_LOG( LOG_ERR, "clock_gettime failed: '%s'\n", strerror(errno) );
 
@@ -569,5 +601,22 @@ static void ctrl_trajq(void) {
     }
     //printf("trajx: "); aa_dump_vec(stdout, dx, 6 );
     //printf("dq: "); aa_dump_vec(stdout, &cx.ref.dq[PIR_AXIS_L0], 8 );
+
+}
+
+static void ctrl_trajq_torso(void) {
+    double t = aa_tm_timespec2sec( aa_tm_sub( cx.now, cx.t0 ) );
+
+    if( t >= cx.trajq->t_f ) {
+        AA_MEM_CPY( cx.G_T.ref.q, cx.trajq->q_f, 1 );
+        AA_MEM_SET( cx.G_T.ref.dq, 0, 1 );
+    } else {
+        // get refs
+        rfx_trajq_get_q( cx.trajq, t, cx.G_T.ref.q );
+        rfx_trajq_get_dq( cx.trajq, t, cx.G_T.ref.dq );
+    }
+
+    int r = rfx_ctrlq_lin_vfwd( &cx.G_T, &cx.Kq_T, &cx.ref.dq[PIR_AXIS_T] );
+    //printf("trajq: "); aa_dump_vec(stdout, &cx.ref.dq[PIR_AXIS_T], 1);
 
 }

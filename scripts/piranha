@@ -97,6 +97,10 @@ pir_start() {
     $SNS run -d -r lwa-right -- \
         can402 -f $CAN_R -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-right -s state-right
 
+
+    $SNS run -d -r torso -- \
+        can402 -f can2 -R 1 -C 0 -n a  -c ref-torso -s state-torso
+
     $SNS run -d -r ft-left -- \
         cftd -f $CAN_L -n 27 -c ft-left -b ft-bias-left -W 1e6
     $SNS run -d -r ft-right -- \
@@ -109,6 +113,7 @@ pir_start() {
 pir_stop() {
     $SNS kill lwa-left
     $SNS kill lwa-right
+    $SNS kill torso
     $SNS kill ft-left
     $SNS kill ft-right
     $SNS kill sdh-left

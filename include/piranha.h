@@ -200,8 +200,10 @@ typedef struct {
     struct timespec now;
     rfx_ctrl_t G_L;
     rfx_ctrl_t G_R;
+    rfx_ctrl_t G_T;
     rfx_ctrl_ws_lin_k_t Kx;
     rfx_ctrlq_lin_k_t Kq;
+    rfx_ctrlq_lin_k_t Kq_T;
     double q_min[PIR_AXIS_CNT];
     double q_max[PIR_AXIS_CNT];
 
@@ -230,6 +232,7 @@ int set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_trajq_torso(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 
 
 int sdh_zero( pirctrl_cx_t *cx, struct pir_msg * );

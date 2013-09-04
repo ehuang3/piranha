@@ -174,6 +174,7 @@ int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
         double t = msg_ctrl->x[i].f;
         double *S = &msg_ctrl->x[i+1].f;
         rfx_trajx_add_duqu( pT, t, S );
+        //printf("i: %d, t: %f: ", i, t); aa_dump_vec( stdout, S, 8 );
     }
 
     // generate
@@ -181,9 +182,9 @@ int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 
     // debugging plot
     {
-        //struct rfx_trajx_plot_opts xopts = {0};
-        //xopts.to_file = 1;
-        //rfx_trajx_plot( pT, .001, &xopts );
+        struct rfx_trajx_plot_opts xopts = {0};
+        xopts.to_file = 1;
+        rfx_trajx_plot( pT, .001, &xopts );
     }
     memcpy( &cx->t0, &cx->now, sizeof(cx->t0) );
 
@@ -213,6 +214,40 @@ int set_mode_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     rfx_trajq_add( &T->traj, msg_ctrl->x[0].f, &msg_ctrl->x[1].f );
 
     rfx_trajq_generate( &T->traj );
+
+    memcpy( &cx->t0, &cx->now, sizeof(cx->t0) );
+
+    //rfx_trajq_plot( &T->traj, .001 );
+
+    cx->trajq = &T->traj;
+
+    return 0;
+}
+
+
+int set_mode_trajq_torso(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    if( msg_ctrl->n != 2 ) return -1;
+    zero_refs(cx);
+
+    // free old stuff
+    aa_mem_region_release( &cx->modereg );
+
+    // aloc
+    rfx_trajq_trapvel_t *T = AA_MEM_REGION_NEW( &cx->modereg, rfx_trajq_trapvel_t );
+    rfx_trajq_trapvel_init( T, &cx->modereg, 1 );
+
+    for( size_t i = 0; i < 1; i ++ ) {
+        T->dq_max[i] = 10.0;
+        T->ddq_max[i] = 10.0;
+    }
+
+    // initial point
+    rfx_trajq_add( &T->traj, 0, cx->state.q + PIR_AXIS_T );
+    rfx_trajq_add( &T->traj, msg_ctrl->x[0].f, &msg_ctrl->x[1].f );
+
+    rfx_trajq_generate( &T->traj );
+
+    //printf( "torso: %f, %f\n", msg_ctrl->x[0].f, msg_ctrl->x[1].f );
 
     memcpy( &cx->t0, &cx->now, sizeof(cx->t0) );
 

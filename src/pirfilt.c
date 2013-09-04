@@ -306,7 +306,9 @@ static void update(void) {
     int u_sl = update_n(7, PIR_AXIS_SDH_L0, &cx.chan_sdhstate_left, &timeout);
     int u_sr = update_n(7, PIR_AXIS_SDH_R0, &cx.chan_sdhstate_right, &timeout);
 
-    is_updated = is_updated || u_sl || u_sr;
+    int u_t = update_n(1, PIR_AXIS_T, &cx.chan_state_torso, &timeout);
+
+    is_updated = is_updated || u_sl || u_sr || u_t;
 
     // force-torque
     int u_fl = update_ft( cx.F_raw_L, &cx.chan_ft_left, &timeout );
