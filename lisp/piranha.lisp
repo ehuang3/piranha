@@ -48,6 +48,7 @@
 
 (defvar *last-traj*)
 
+(defvar *state*)
 
 (defun pir-start ()
   (assert (null *ctrl-channel*))
@@ -125,25 +126,26 @@
             (q (extract 'q 29)))
         (multiple-value-bind (r-l x-l) (amino::tf-duqu2qv s-l)
           (multiple-value-bind (r-r x-r) (amino::tf-duqu2qv s-r)
-            (make-pir-state
-             :q q
-             :dq (extract 'dq 29)
-             :q-l (amino::vec-copy q :start 1 :end 8)
-             :q-r (amino::vec-copy q :start 8 :end 15)
-             :q-sdh-l (amino::vec-copy q :start 15 :end 22)
-             :q-sdh-r (amino::vec-copy q :start 22 :end 28)
-             :f-l (extract 'f-l 6)
-             :f-r (extract 'f-r 6)
-             :s-l s-l
-             :s-r s-r
-             :s-eer-l s-eer-l
-             :s-eer-r s-eer-r
-             :s-f-l (aa::tf-duqu-mul s-l s-eer-l)
-             :s-f-r (aa::tf-duqu-mul s-r s-eer-r)
-             :r-l r-l
-             :r-r r-r
-             :x-l x-l
-             :x-r x-r)))))))
+            (setq *state*
+                  (make-pir-state
+                   :q q
+                   :dq (extract 'dq 29)
+                   :q-l (amino::vec-copy q :start 1 :end 8)
+                   :q-r (amino::vec-copy q :start 8 :end 15)
+                   :q-sdh-l (amino::vec-copy q :start 15 :end 22)
+                   :q-sdh-r (amino::vec-copy q :start 22 :end 28)
+                   :f-l (extract 'f-l 6)
+                   :f-r (extract 'f-r 6)
+                   :s-l s-l
+                   :s-r s-r
+                   :s-eer-l s-eer-l
+                   :s-eer-r s-eer-r
+                   :s-f-l (aa::tf-duqu-mul s-l s-eer-l)
+                   :s-f-r (aa::tf-duqu-mul s-r s-eer-r)
+                   :r-l r-l
+                   :r-r r-r
+                   :x-l x-l
+                   :x-r x-r))))))))
 
 (defun pir-set-mode (msg mode)
   (assert (< (length mode) 63))
@@ -180,10 +182,10 @@
 
 (defun trajx-point-data (points)
   (let* ((n (length points))
-         (data (amino::make-vec (* 9 (length points)))))
+         (data (amino::make-vec (* 9 n))))
     (dotimes (i n)
       (let ((point (elt points i))
-            (offset (* i n)))
+            (offset (* i (/ (length data) n))))
         (setf (aref data offset)
               (trajx-point-time point))
         (replace data (amino::matrix-data (trajx-point-pose point))
@@ -266,3 +268,6 @@
 
 (defun pir-zero (&optional (time 5d0))
   (pir-set *q-zero* :time time))
+
+(defun pir-pose ()
+  (pir-state-s-f-l (get-state)))
