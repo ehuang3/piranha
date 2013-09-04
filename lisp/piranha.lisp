@@ -200,18 +200,21 @@
   (pir-message "trajx" (trajx-point-data points)))
 
 (defun pir-go-rel (&key
-                   (x (amino::col-vector 0 0 0))
+                   (x 0d0)
+                   (y 0d0)
+                   (z 0d0)
+                   (xyz (amino::col-vector x y z))
                    (time 5d0)
                    (r amino::+tf-quat-ident+))
   (let ((state (get-state)))
-    (let* ((S-rel (amino::tf-qv2duqu r x))
+    (let* ((S-rel (amino::tf-qv2duqu r xyz))
            (S-1 (amino::tf-duqu-mul (pir-state-s-f-l state) S-rel)))
       (pir-go (list (make-trajx-point :pose S-1
                                       :time time))
               :state state))))
 
 (defun pir-screw (x theta &key (time 5d0))
-  (pir-go-rel :x (amino::col-vector x 0 0)
+  (pir-go-rel :x x
               :r (amino::tf-xangle2quat theta)
               :time time))
 
@@ -270,4 +273,19 @@
   (pir-set *q-zero* :time time))
 
 (defun pir-pose ()
-  (pir-state-s-f-l (get-state)))
+  (let ((s (pir-state-s-f-l (get-state))))
+    (values s
+            (aa::tf-duqu-trans s))))
+
+
+(defun xyz2duqu (x y z)
+  (aa::tf-xxyz2duqu 0d0 x y z))
+
+(defun pose-hover (s z)
+  (aa::tf-duqu-mul s
+                   (aa::tf-qv2duqu (amino::tf-yangle2quat (/ pi 2)) (aa::vec 0d0 0d0 z))))
+(defun go-grasp (s z0 z1 &key (t0 5d0) (t1 10d0))
+  (pir-go (list (make-trajx-point :pose (pose-hover s z0)
+                                  :time t0)
+                (make-trajx-point :pose (pose-hover s z1)
+                                  :time t1))))
