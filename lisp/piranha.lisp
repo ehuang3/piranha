@@ -199,6 +199,13 @@
                             points))
   (pir-message "trajx" (trajx-point-data points)))
 
+(defun pir-go-1 (s &optional (time 10d0))
+  (let ((state (get-state)))
+    (pir-go (list (make-trajx-point :pose s
+                                    :time time))
+            :state state)))
+
+
 (defun pir-go-rel (&key
                    (x 0d0)
                    (y 0d0)
@@ -254,7 +261,7 @@
 
 
 (defparameter *q-start*
-  (aa::vec (* .1 pi) (* -.3 pi) (* -.3 pi) (* -.3 pi) (* -.25 pi) (* .35 pi) (* .5 pi)))
+  (aa::vec (* .25 pi) (* -.3 pi) (* -.3 pi) (* -.4 pi) (* -.25 pi) (* .40 pi) (* .45 pi)))
 
 
 (defparameter *q-store*

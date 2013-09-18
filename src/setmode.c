@@ -181,11 +181,11 @@ int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     rfx_trajx_generate( pT );
 
     // debugging plot
-    {
-        struct rfx_trajx_plot_opts xopts = {0};
-        xopts.to_file = 1;
-        rfx_trajx_plot( pT, .001, &xopts );
-    }
+    /* { */
+    /*     struct rfx_trajx_plot_opts xopts = {0}; */
+    /*     xopts.to_file = 1; */
+    /*     rfx_trajx_plot( pT, .001, &xopts ); */
+    /* } */
     memcpy( &cx->t0, &cx->now, sizeof(cx->t0) );
 
     cx->trajx = pT;

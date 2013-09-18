@@ -3,7 +3,7 @@ AM_CPPFLAGS = -I$(top_srcdir)/include
 
 bin_PROGRAMS = pirctrl pirfilt pirdump
 
-noinst_PROGRAMS = pirtest
+noinst_PROGRAMS = pirtest testkin
 
 pirdump_SOURCES = src/pirdump.c
 pirdump_LDADD = -lsns -lach  -lreflex -lamino -lblas -llapack
@@ -23,6 +23,11 @@ libpiranha_la_SOURCES =                  \
 
 pirtest_SOURCES = src/pirtest.c
 pirtest_LDADD = -lsns  -lamino -lsocanmatic -lblas -llapack -lreflex libpiranha.la
+
+
+testkin_SOURCES = src/testkin.c
+testkin_LDADD = -lsns  -lamino -lsocanmatic -lblas -llapack -lreflex libpiranha.la
+
 
 pirfilt_SOURCES = src/pirfilt.c
 pirfilt_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex
