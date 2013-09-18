@@ -259,23 +259,28 @@
           (aref v 6) (* pi (coerce q6 'double-float)))
   (pir-message "sdh-set" v)))
 
+(defparameter *q-zero*
+  (aa::vec 0 0 0 0 0 0 0))
 
-(defparameter *q-start*
-  (aa::vec (* .25 pi) (* -.3 pi) (* -.3 pi) (* -.4 pi) (* -.25 pi) (* .40 pi) (* .45 pi)))
-
-
-(defparameter *q-store*
-  (aa::vec (* .5 pi) (* -.25 pi) (* 0 pi) (* -.25 pi) (* -.25 pi) 0 0))
+;; Right Arm
 
 (defparameter *q-zero*
   (aa::vec 0 0 0 0 0 0 0))
 
-(defun pir-go-start ()
-       (pir-set (aa::vec 0 0 0 0 0 0 0))
-       (sleep 10.5)
-       (pir-set (aa::vec (* .5 pi) 0 0 0 0 0 0) :time 4d0)
-       (sleep 4.5)
-       (pir-set *q-start*))
+(defparameter *q-1*
+  (aa::vec (* -.5 pi) (* .25 pi) 0
+           (* .25 pi)
+           0 0 0 ))
+
+(defparameter *q-2*
+  (aa::vec (* -.5 pi) 0.4693713957388351d0 0
+           1.2163025024223284d0
+           0 -1.3799445730893167d0 0 ))
+
+(defparameter *q-3*
+  (aa::vec -0.49843112778454063d0 0.9774891008719442d0 0.5948082090796675d0
+           1.3528919696834045d0
+           1.1006395328926641d0 -1.3931567155269138d0 -1.5021350740214396d0))
 
 (defun pir-pinch (y r)
   (pir-message "pinch" (aa::vec r y)))
