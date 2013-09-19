@@ -584,15 +584,22 @@ static void ctrl_trajx(void) {
 static void ctrl_trajq(void) {
     double t = aa_tm_timespec2sec( aa_tm_sub( cx.now, cx.t0 ) );
 
-    if( t >= cx.trajq->t_f ) {
-        AA_MEM_CPY( cx.G_L.ref.q, cx.trajq->q_f, 7 );
-        AA_MEM_SET( cx.G_L.ref.dq, 0, 7 );
-    } else {
-        // get refs
-        rfx_trajq_get_q( cx.trajq, t, cx.G_L.ref.q );
-        rfx_trajq_get_dq( cx.trajq, t, cx.G_L.ref.dq );
+    /* if( t >= cx.trajq->t_f ) { */
+    /*     AA_MEM_CPY( cx.G_L.ref.q, cx.trajq->q_f, 7 ); */
+    /*     AA_MEM_SET( cx.G_L.ref.dq, 0, 7 ); */
+    /* } else { */
+    /*     // get refs */
+    /*     rfx_trajq_get_q( cx.trajq, t, cx.G_L.ref.q ); */
+    /*     rfx_trajq_get_dq( cx.trajq, t, cx.G_L.ref.dq ); */
+    /* } */
+
+    // don't go past the end
+    if( t >= cx.trajq_segs->t_f ) {
+        t = cx.trajq_segs->t_f;
     }
 
+    // get refs
+    rfx_trajq_seg_list_get_dq( cx.trajq_segs, t, cx.G_L.ref.q, cx.G_L.ref.dq );
 
     int r = rfx_ctrlq_lin_vfwd( &cx.G_L, &cx.Kq, &cx.ref.dq[PIR_AXIS_L0] );
     if( RFX_OK != r ) {
@@ -617,6 +624,7 @@ static void ctrl_trajq_torso(void) {
     }
 
     int r = rfx_ctrlq_lin_vfwd( &cx.G_T, &cx.Kq_T, &cx.ref.dq[PIR_AXIS_T] );
+    (void)r;
     //printf("trajq: "); aa_dump_vec(stdout, &cx.ref.dq[PIR_AXIS_T], 1);
 
 }
