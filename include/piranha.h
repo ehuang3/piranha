@@ -73,7 +73,7 @@
 
 // TODO: Adjust for new tool changer
 
-#define SDH_L0 98e-3      ///< Base connector to finger joint
+#define SDH_LB 98e-3      ///< Base connector to finger joint
 #define SDH_L1 0.0865     ///< Lower finger joint
 #define SDH_L2 0.0675     ///< Upper finger joint
 #define SDH_B 66e-3       ///< distance between fingers

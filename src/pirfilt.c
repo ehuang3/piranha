@@ -358,12 +358,12 @@ static int kinematics( void ) {
     /*-- Hand --*/
     {
         double y1, y2;
-        rfx_kin_2d2_fk( SDH_L0, SDH_L0,
+        rfx_kin_2d2_fk( SDH_L1, SDH_L2,
                         cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L0],
                         cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L1],
                         NULL,
                         &y1 );
-        rfx_kin_2d2_fk( SDH_L0, SDH_L0,
+        rfx_kin_2d2_fk( SDH_L1, SDH_L2,
                         cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R0],
                         cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R1],
                         NULL,
@@ -372,7 +372,7 @@ static int kinematics( void ) {
         /* double v[3] = { LWA4_FT_L + SDH_L0 + (y1+y2/2), 0, SDH_FC}; */
         /* aa_tf_qv2duqu( aa_tf_quat_ident, v, cx.S_eer_L ); */
         double s0[8], s1[8];
-        double x = LWA4_L_e + LWA4_FT_L + SDH_L0 + (y1+y2/2);
+        double x = LWA4_L_e + LWA4_FT_L + SDH_LB + (y1+y2)/2;
         aa_tf_xxyz2duqu( -60 * M_PI/180, x, 0, 0, s0 );
         aa_tf_xxyz2duqu( 0, 0, 0, -SDH_FC, s1 );
         aa_tf_duqu_mul( s0, s1, cx.state.S_eer_L );
