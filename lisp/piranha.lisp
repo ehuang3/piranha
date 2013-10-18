@@ -251,16 +251,15 @@
                  :start1 (+ 1 offset) :end1 (+ 8 offset))))
     data))
 
+(defun pir-trajq (points)
+  (pir-message "trajq" (trajq-point-data points)))
+
+
 
 (defun pir-set (q &key (time 10d0))
   (check-type q (simple-array double-float (7)))
-  (let ((vec (amino::make-vec 8)))
-    (setf (aref vec 0) time)
-    (replace vec q :start1 1)
-    (pir-message "trajq" vec)))
+  (pir-trajq (list (make-trajq-point :q q :time time))))
 
-(defun pir-trajq (points)
-  (pir-message "trajq" (trajq-point-data points)))
 
 (defun pir-torso (q &key (time 10d0))
   (pir-message "trajq-torso" (aa::vec time q)))
