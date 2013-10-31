@@ -212,7 +212,7 @@ typedef struct {
 } pirctrl_cx_t;
 
 /*------ MODES --------*/
-typedef void (*pir_ctrl_fun_t)(void);
+typedef void (*pir_ctrl_fun_t)( pirctrl_cx_t *);
 typedef int (*pir_mode_fun_t)(pirctrl_cx_t *, struct pir_msg *);
 
 struct pir_mode_desc {
@@ -234,6 +234,23 @@ int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq_torso(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+
+
+// all the different control modes
+typedef void (*ctrl_fun_t)(void);
+void ctrl_joint_left_shoulder( pirctrl_cx_t *cx );
+void ctrl_joint_left_wrist( pirctrl_cx_t *cx );
+void ctrl_joint_right_shoulder( pirctrl_cx_t *cx );
+void ctrl_joint_right_wrist( pirctrl_cx_t *cx );
+void ctrl_ws_left( pirctrl_cx_t *cx );
+void ctrl_ws_left_finger( pirctrl_cx_t *cx );
+void ctrl_ws_right( pirctrl_cx_t *cx );
+void ctrl_zero( pirctrl_cx_t *cx );
+void ctrl_sin( pirctrl_cx_t *cx );
+void ctrl_step( pirctrl_cx_t *cx );
+void ctrl_trajx( pirctrl_cx_t *cx );
+void ctrl_trajq( pirctrl_cx_t *cx );
+void ctrl_trajq_torso( pirctrl_cx_t *cx );
 
 
 int sdh_zero( pirctrl_cx_t *cx, struct pir_msg * );
