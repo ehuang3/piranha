@@ -8,6 +8,19 @@ Force/Torque Sensors
 * Workaround: set node id to 0x27, so we only conflict with CANopen
   nodes > 0x70
 
+
+PROGRAMS
+========
+* pirfilt -- collect state messges from all drivers and combine into one message
+* pirctrl -- a motion libary of sorts
+
+SCRIPTS
+=======
+* scripts/piranha -- Start robot drivers
+* scripts/piranha-console -- Start joystick daemon and relay messages
+* scripts/piranha-console -- Relate state and control messages
+
+
 # Local Variables:
 #   mode: markdown
 # End:

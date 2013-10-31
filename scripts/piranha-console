@@ -47,9 +47,15 @@ fi
 
 case "$1" in
     start)
-        achcop -rd  -P /tmp/ach-pir-joy.ppd -p /tmp/ach-pir-joy.pid -- \
+        ach mk -1 joystick
+        $SNS run -d -r ach-pir-joyd -- \
             achd -r push calvin joystick
-        $SNS run -d -r  joyd -- joyd-logitech-f310
+        $SNS run -d -r  joyd -- \
+            joyd-logitech-f310
+        ;;
+    stop)
+        $SNS kill joyd
+        $SNS kill ach-pir-joyd
         ;;
     *)
         echo "Invalid command"

@@ -43,91 +43,18 @@ else
     exit 1
 fi
 
-pir_ach_mk() {
 
-    ach mk -1 -o 666 ref-torso
-    ach mk -1 -o 666 state-torso
-    ach mk -1 -o 666 ref-left
-    ach mk -1 -o 666 state-left
-    ach mk -1 -o 666 ref-right
-    ach mk -1 -o 666 state-right
-
-    ach mk -1 -o 666 sdhref-left
-    ach mk -1 -o 666 sdhstate-left
-
-    ach mk -1 -o 666 sdhref-right
-    ach mk -1 -o 666 sdhstate-right
-
-    ach mk -1 -o 666 ft-left
-    ach mk -1 -o 666 ft-right
-    ach mk -1 -o 666 ft-bias-left
-    ach mk -1 -o 666 ft-bias-right
-
-    ach mk -1 -o 666 pir-ctrl
-    ach mk -1 -o 666 pir-state
-
-    ach mk -1 -o 666 joystick
-}
-
-pir_ach_rm() {
-    ach rm ref-torso
-    ach rm state-torso
-    ach rm ref-left
-    ach rm state-left
-    ach rm ref-right
-    ach rm state-right
-    ach rm joystick
-    ach rm pir-ctrl
-    ach rm pir-state
-    ach rm ft-left
-    ach rm ft-right
-    ach rm ft-bias-left
-    ach rm ft-bias-right
-}
-
-
-# SocketCAN interfaces
-CAN_L=can0
-CAN_R=can1
-CAN_T=can2
-
-CAN_SDH_L=can2 # esd CAN
-
-pir_start() {
-    pir_ach_mk
-    $SNS run -d -r lwa-left -- \
-        can402 -f $CAN_L -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-left -s state-left
-    $SNS run -d -r lwa-right -- \
-        can402 -f $CAN_R -R 1 -C 0 -n 3 -n 4 -n 5 -n 6 -n 7 -n 8 -n 9 -c ref-right -s state-right
-
-
-    $SNS run -d -r torso -- \
-        can402 -f can2 -R 1 -C 0 -n a  -c ref-torso -s state-torso
-
-    $SNS run -d -r ft-left -- \
-        cftd -f $CAN_L -n 27 -c ft-left -b ft-bias-left -W 1e6
-    $SNS run -d -r ft-right -- \
-        cftd -f $CAN_R -n 27 -c ft-right -b ft-bias-right -W 1e6
-
-    $SNS run -d -r sdh-left -- \
-        sdhiod -b $CAN_SDH_L -c sdhref-left -s sdhstate-left
-}
-
-pir_stop() {
-    $SNS kill lwa-left
-    $SNS kill lwa-right
-    $SNS kill torso
-    $SNS kill ft-left
-    $SNS kill ft-right
-    $SNS kill sdh-left
-}
 
 case "$1" in
     start)
-        pir_start
+        $SNS run -d ach-pir-ctrl -- \
+            achd -r push calvin pir-ctrl
+        $SNS run -d ach-pir-state -- \
+            achd -r pull calvin pir-state
         ;;
     stop)
-        pir_stop
+        $SNS kill ach-pir-ctrl
+        $SNS kill ach-pir-state
         ;;
     *)
         echo "Invalid command"
