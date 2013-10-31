@@ -232,7 +232,8 @@ int set_mode_ws_left_finger(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
-int set_mode_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_trajq_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_trajq_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq_torso(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 
 
@@ -249,7 +250,8 @@ void ctrl_zero( pirctrl_cx_t *cx );
 void ctrl_sin( pirctrl_cx_t *cx );
 void ctrl_step( pirctrl_cx_t *cx );
 void ctrl_trajx( pirctrl_cx_t *cx );
-void ctrl_trajq( pirctrl_cx_t *cx );
+void ctrl_trajq_left( pirctrl_cx_t *cx );
+void ctrl_trajq_right( pirctrl_cx_t *cx );
 void ctrl_trajq_torso( pirctrl_cx_t *cx );
 
 

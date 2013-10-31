@@ -43,8 +43,8 @@
 
 
 
-(defparameter *ctrl-channel* nil)
-(defparameter *state-channel* nil)
+(defvar *ctrl-channel* nil)
+(defvar *state-channel* nil)
 
 (defvar *last-traj*)
 
@@ -251,14 +251,23 @@
                  :start1 (+ 1 offset) :end1 (+ 8 offset))))
     data))
 
-(defun pir-trajq (points)
-  (pir-message "trajq" (trajq-point-data points)))
+
+(defun pir-trajq-left (points)
+  (pir-message "trajq-left" (trajq-point-data points)))
+
+(defun pir-trajq-right (points)
+  (pir-message "trajq-right" (trajq-point-data points)))
+
+(defun pir-trajq (side points)
+  (pir-message (ecase side
+                 (:left "trajq-left")
+                 (:right "trajq-right"))
+               (trajq-point-data points)))
 
 
-
-(defun pir-set (q &key (time 10d0))
+(defun pir-set (side q &key (time 10d0))
   (check-type q (simple-array double-float (7)))
-  (pir-trajq (list (make-trajq-point :q q :time time))))
+  (pir-trajq side (list (make-trajq-point :q q :time time))))
 
 
 (defun pir-torso (q &key (time 10d0))
@@ -307,27 +316,27 @@
            1.1006395328926641d0 -1.3931567155269138d0 -1.5021350740214396d0))
 
 (defun pir-trajq-zero->3 ()
-  (pir-trajq (list (make-trajq-point :q *q-0* :time 5d0)
-                   (make-trajq-point :q *q-2* :time 15d0)
-                   (make-trajq-point :q *q-3* :time 25d0))))
+  (pir-trajq :left (list (make-trajq-point :q *q-0* :time 5d0)
+                         (make-trajq-point :q *q-2* :time 15d0)
+                         (make-trajq-point :q *q-3* :time 25d0))))
 
 (defun pir-trajq-3->store ()
-  (pir-trajq (list (make-trajq-point :q *q-2* :time 6d0)
-                   (make-trajq-point :q *q-1* :time 9d0))))
+  (pir-trajq :left (list (make-trajq-point :q *q-2* :time 6d0)
+                         (make-trajq-point :q *q-1* :time 9d0))))
 
 (defun pir-trajq-store->3 ()
-  (pir-trajq (list (make-trajq-point :q *q-2* :time 3d0)
-                   (make-trajq-point :q *q-3* :time 9d0))))
+  (pir-trajq :left (list (make-trajq-point :q *q-2* :time 3d0)
+                         (make-trajq-point :q *q-3* :time 9d0))))
 
 (defun pir-trajq-store->zero ()
-  (pir-trajq (list (make-trajq-point :q *q-0* :time 8d0)
-                   (make-trajq-point :q *q-zero* :time 12d0))))
+  (pir-trajq :left (list (make-trajq-point :q *q-0* :time 8d0)
+                         (make-trajq-point :q *q-zero* :time 12d0))))
 
 (defun pir-pinch (y r)
   (pir-message "pinch" (aa::vec r y)))
 
-(defun pir-zero (&optional (time 5d0))
-  (pir-set *q-zero* :time time))
+(defun pir-zero (side &optional (time 5d0))
+  (pir-set side *q-zero* :time time))
 
 (defun pir-pose ()
   (let ((s (pir-state-s-f-l (get-state))))

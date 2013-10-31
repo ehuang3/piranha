@@ -163,17 +163,8 @@ void ctrl_trajx( pirctrl_cx_t *cx ) {
 
 }
 
-void ctrl_trajq( pirctrl_cx_t *cx ) {
+static void ctrl_trajq_lr( pirctrl_cx_t *cx, rfx_ctrl_t *G, size_t off ) {
     double t = aa_tm_timespec2sec( aa_tm_sub( cx->now, cx->t0 ) );
-
-    /* if( t >= cx->trajq->t_f ) { */
-    /*     AA_MEM_CPY( cx->G_L.ref.q, cx->trajq->q_f, 7 ); */
-    /*     AA_MEM_SET( cx->G_L.ref.dq, 0, 7 ); */
-    /* } else { */
-    /*     // get refs */
-    /*     rfx_trajq_get_q( cx->trajq, t, cx->G_L.ref.q ); */
-    /*     rfx_trajq_get_dq( cx->trajq, t, cx->G_L.ref.dq ); */
-    /* } */
 
     // don't go past the end
     if( t >= cx->trajq_segs->t_f ) {
@@ -181,16 +172,21 @@ void ctrl_trajq( pirctrl_cx_t *cx ) {
     }
 
     // get refs
-    rfx_trajq_seg_list_get_dq( cx->trajq_segs, t, cx->G_L.ref.q, cx->G_L.ref.dq );
+    rfx_trajq_seg_list_get_dq( cx->trajq_segs, t, G->ref.q,G->ref.dq );
 
-    int r = rfx_ctrlq_lin_vfwd( &cx->G_L, &cx->Kq, &cx->ref.dq[PIR_AXIS_L0] );
+    int r = rfx_ctrlq_lin_vfwd( G, &cx->Kq, &cx->ref.dq[off] );
     if( RFX_OK != r ) {
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );
     }
-    //printf("trajx: "); aa_dump_vec(stdout, dx, 6 );
-    //printf("dq: "); aa_dump_vec(stdout, &cx->ref.dq[PIR_AXIS_L0], 8 );
 
+}
+void ctrl_trajq_left( pirctrl_cx_t *cx ) {
+    ctrl_trajq_lr( cx, &cx->G_L, PIR_AXIS_L0 );
+}
+
+void ctrl_trajq_right( pirctrl_cx_t *cx ) {
+    ctrl_trajq_lr( cx, &cx->G_R, PIR_AXIS_R0 );
 }
 
 void ctrl_trajq_torso( pirctrl_cx_t *cx ) {
