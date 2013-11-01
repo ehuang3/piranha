@@ -157,6 +157,8 @@ int pir_kin_solve( double q0[7], double S1[8], double q1[7] );
 
 struct pir_msg {
     char mode[64];
+    uint64_t salt;
+    uint64_t seq_no;
     uint64_t n;
     union {
         int64_t i;
@@ -165,7 +167,8 @@ struct pir_msg {
 };
 
 struct pir_msg_complete {
-    uint64_t n;
+    uint64_t salt;
+    uint64_t seq_no;
 };
 
 struct pir_mode_desc;
@@ -213,6 +216,7 @@ typedef struct {
     double q_max[PIR_AXIS_CNT];
 
     double sint;
+
 } pirctrl_cx_t;
 
 /*------ MODES --------*/

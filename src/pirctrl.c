@@ -161,7 +161,7 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_sdhref_left,  "sdhref-left",  NULL );
     sns_chan_open( &cx.chan_sdhref_right, "sdhref-right", NULL );
     sns_chan_open( &cx.chan_state_pir,    "pir-state",    NULL );
-    sns_chan_open( &cx.chan_complete,     "pir-state",    NULL );
+    sns_chan_open( &cx.chan_complete,     "pir-complete",    NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_pir, &cx.chan_js, NULL};
         sns_sigcancel( chans, sns_sig_term_default );
@@ -366,7 +366,8 @@ static void set_mode(void) {
                                         &frame_size, NULL, ACH_O_LAST );
     if( ACH_OK == r || ACH_MISSED_FRAME == r ) {
         msg_ctrl->mode[63] = '\0';
-        printf("looking for mode: %s\n",msg_ctrl->mode);
+        printf( "ctrl_msg: `%s', %"PRIu64" (%"PRIu64")\n",
+                msg_ctrl->mode, msg_ctrl->seq_no, msg_ctrl->salt );
         for( size_t i = 0; mode_desc[i].name != NULL; i ++ ) {
             if( 0 == strcmp(msg_ctrl->mode, mode_desc[i].name) ) {
                 printf("found mode: %s\n", mode_desc[i].name);
@@ -374,6 +375,7 @@ static void set_mode(void) {
                     if( 0 == mode_desc[i].setmode( &cx, msg_ctrl ) &&
                         mode_desc[i].ctrl )
                     {
+                        memcpy( &cx.msg_ctrl, msg_ctrl, sizeof(cx.msg_ctrl) );
                         cx.mode = &mode_desc[i];
                     }
                 }

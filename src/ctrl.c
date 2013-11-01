@@ -5,6 +5,16 @@
 // 20 deg/s
 #define MAXVEL_FACTOR 20 * M_PI/180
 
+static void pir_complete( pirctrl_cx_t *cx ) {
+    struct pir_msg_complete msg = { .salt = cx->msg_ctrl.salt,
+                                    .seq_no = cx->msg_ctrl.seq_no };
+    msg.seq_no = cx->msg_ctrl.seq_no;
+    ach_status_t r = ach_put( &cx->chan_complete, &msg, sizeof(msg) );
+    if( ACH_OK != r ) {
+        SNS_LOG( LOG_ERR, "couldn't put pir_msg_complete: `%s'\n",
+                 ach_result_to_string(r) );
+    }
+}
 
 void ctrl_joint_torso( pirctrl_cx_t *cx ) {
     double u = cx->ref.user[GAMEPAD_AXIS_RT] - cx->ref.user[GAMEPAD_AXIS_LT];
@@ -141,6 +151,7 @@ void ctrl_trajx( pirctrl_cx_t *cx ) {
         //aa_tf_qv2duqu( cx->trajx->pt_f->r, cx->trajx->pt_f->x, cx->G_L.ref.S );
         aa_tf_qv2duqu( cx->trajx->pt_f->r, cx->trajx->pt_f->x, S_traj );
         AA_MEM_SET( cx->G_L.ref.dx, 0, 6 );
+        pir_complete(cx);
     } else {
         rfx_trajx_get_x_duqu( cx->trajx, t, S_traj );
         //rfx_trajx_get_dx( cx->trajx, t, cx->G_L.ref.dx );
@@ -169,6 +180,7 @@ static void ctrl_trajq_lr( pirctrl_cx_t *cx, rfx_ctrl_t *G, size_t off ) {
     // don't go past the end
     if( t >= cx->trajq_segs->t_f ) {
         t = cx->trajq_segs->t_f;
+        pir_complete(cx);
     }
 
     // get refs
@@ -195,6 +207,7 @@ void ctrl_trajq_torso( pirctrl_cx_t *cx ) {
     if( t >= cx->trajq->t_f ) {
         AA_MEM_CPY( cx->G_T.ref.q, cx->trajq->q_f, 1 );
         AA_MEM_SET( cx->G_T.ref.dq, 0, 1 );
+        pir_complete(cx);
     } else {
         // get refs
         rfx_trajq_get_q( cx->trajq, t, cx->G_T.ref.q );

@@ -47,6 +47,9 @@
 (defvar *state-channel* nil)
 (defvar *complete-channel* nil)
 
+(defvar *message-seq-no* 0)
+(defvar *message-salt*)
+
 (defvar *last-traj*)
 
 (defvar *state*)
@@ -55,7 +58,7 @@
   (assert (null *ctrl-channel*))
   (setq *ctrl-channel* (ach::open-channel "pir-ctrl"))
   (setq *state-channel* (ach::open-channel "pir-state"))
-  (setq *state-channel* (ach::open-channel "pir-complete")))
+  (setq *complete-channel* (ach::open-channel "pir-complete")))
 
 (defun pir-stop ()
   (ach::close-channel *ctrl-channel*)
@@ -64,11 +67,13 @@
 
 (cffi:defcstruct pir-message
   (type :char :count 64)
+  (salt :uint64)
+  (seq-no :uint64)
   (n :uint64))
 
 (cffi:defcstruct pir-message-complete
-  (n :uint64))
-
+  (salt :uint64)
+  (seq-no :uint64))
 
 
 (cffi:defcstruct pir-cstate
@@ -171,6 +176,10 @@
     (pir-set-mode msg mode)
     (setf (foreign-slot-value msg '(:struct pir-message) 'n)
           (length data))
+    (setf (foreign-slot-value msg '(:struct pir-message) 'seq-no)
+          (incf *message-seq-no*))
+    (setf (foreign-slot-value msg '(:struct pir-message) 'salt)
+          (setq *message-salt* (random (expt 2 64))))
     (dotimes (i (length data))
       (let ((pointer (inc-pointer (foreign-slot-pointer msg '(:struct pir-message) 'n)
                                   (* 8 (1+ i))))
@@ -181,6 +190,29 @@
           (double-float
            (setf (mem-aref pointer :double) x)))))
     (ach::put-pointer *ctrl-channel* msg msg-size)))
+
+(defun pir-wait (&key (seq-no *message-seq-no*) (salt *message-salt*))
+  (labels ((get-msg ()
+             (with-foreign-object (msg '(:struct pir-message-complete))
+               (ach::get-pointer *complete-channel* msg (foreign-type-size '(:struct pir-message-complete))
+                                 :wait t)
+               (values (foreign-slot-value msg '(:struct pir-message-complete) 'salt)
+                       (foreign-slot-value msg '(:struct pir-message-complete) 'seq-no))))
+           (done-p ()
+             (multiple-value-bind (msg-salt msg-seq-no) (get-msg)
+               (if (and (= salt msg-salt)
+                        (= seq-no msg-seq-no))
+                   t
+                   (progn
+                     (unless (= msg-seq-no (1- seq-no))
+                       (format t "~&Unexpected values -- salt: ~D, seq-no ~D~&"
+                               msg-salt msg-seq-no))
+                     nil)))))
+    ;; TODO: should also do a sanity check of state message to ensure
+    ;; velocity is sufficiently small
+    (format t "Waiting for salt: ~D, seq-no: ~D~&"
+            salt seq-no)
+    (loop until (done-p))))
 
 (defstruct trajx-point
   pose
