@@ -45,6 +45,7 @@
 
 (defvar *ctrl-channel* nil)
 (defvar *state-channel* nil)
+(defvar *complete-channel* nil)
 
 (defvar *last-traj*)
 
@@ -53,7 +54,8 @@
 (defun pir-start ()
   (assert (null *ctrl-channel*))
   (setq *ctrl-channel* (ach::open-channel "pir-ctrl"))
-  (setq *state-channel* (ach::open-channel "pir-state")))
+  (setq *state-channel* (ach::open-channel "pir-state"))
+  (setq *state-channel* (ach::open-channel "pir-complete")))
 
 (defun pir-stop ()
   (ach::close-channel *ctrl-channel*)
@@ -63,6 +65,10 @@
 (cffi:defcstruct pir-message
   (type :char :count 64)
   (n :uint64))
+
+(cffi:defcstruct pir-message-complete
+  (n :uint64))
+
 
 
 (cffi:defcstruct pir-cstate

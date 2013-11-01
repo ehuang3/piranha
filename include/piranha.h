@@ -164,6 +164,9 @@ struct pir_msg {
     } x [1];
 };
 
+struct pir_msg_complete {
+    uint64_t n;
+};
 
 struct pir_mode_desc;
 
@@ -175,6 +178,7 @@ typedef struct {
     ach_channel_t chan_ref_right;
     ach_channel_t chan_state_pir;
     ach_channel_t chan_ctrl;
+    ach_channel_t chan_complete;
 
     ach_channel_t chan_sdhref_left;
     ach_channel_t chan_sdhref_right;

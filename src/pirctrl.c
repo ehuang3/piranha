@@ -153,14 +153,15 @@ int main( int argc, char **argv ) {
     sns_start();
 
     // open channel
-    sns_chan_open( &cx.chan_js,          "joystick",    NULL );
-    sns_chan_open( &cx.chan_ctrl,        "pir-ctrl",    NULL );
-    sns_chan_open( &cx.chan_ref_torso,   "ref-torso",   NULL );
-    sns_chan_open( &cx.chan_ref_left,    "ref-left",    NULL );
-    sns_chan_open( &cx.chan_ref_right,   "ref-right",   NULL );
-    sns_chan_open( &cx.chan_sdhref_left,    "sdhref-left",    NULL );
-    sns_chan_open( &cx.chan_sdhref_right,   "sdhref-right",   NULL );
-    sns_chan_open( &cx.chan_state_pir,   "pir-state",   NULL );
+    sns_chan_open( &cx.chan_js,           "joystick",     NULL );
+    sns_chan_open( &cx.chan_ctrl,         "pir-ctrl",     NULL );
+    sns_chan_open( &cx.chan_ref_torso,    "ref-torso",    NULL );
+    sns_chan_open( &cx.chan_ref_left,     "ref-left",     NULL );
+    sns_chan_open( &cx.chan_ref_right,    "ref-right",    NULL );
+    sns_chan_open( &cx.chan_sdhref_left,  "sdhref-left",  NULL );
+    sns_chan_open( &cx.chan_sdhref_right, "sdhref-right", NULL );
+    sns_chan_open( &cx.chan_state_pir,    "pir-state",    NULL );
+    sns_chan_open( &cx.chan_complete,     "pir-state",    NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_pir, &cx.chan_js, NULL};
         sns_sigcancel( chans, sns_sig_term_default );

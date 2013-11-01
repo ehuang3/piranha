@@ -51,10 +51,13 @@ case "$1" in
             achd -r push calvin pir-ctrl
         $SNS run -d ach-pir-state -- \
             achd -r pull calvin pir-state
+        $SNS run -d ach-pir-complete -- \
+            achd -r pull calvin pir-complete
         ;;
     stop)
         $SNS kill ach-pir-ctrl
         $SNS kill ach-pir-state
+        $SNS kill ach-pir-complete
         ;;
     *)
         echo "Invalid command"

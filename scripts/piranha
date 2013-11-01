@@ -65,6 +65,7 @@ pir_ach_mk() {
 
     ach mk -1 -o 666 pir-ctrl
     ach mk -1 -o 666 pir-state
+    ach mk -1 -o 666 pir-complete
 
     ach mk -1 -o 666 joystick
 }
@@ -79,6 +80,7 @@ pir_ach_rm() {
     ach rm joystick
     ach rm pir-ctrl
     ach rm pir-state
+    ach rm pir-complete
     ach rm ft-left
     ach rm ft-right
     ach rm ft-bias-left
