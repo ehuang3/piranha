@@ -138,6 +138,7 @@ struct pir_mode_desc mode_desc[] = {
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
 
 int main( int argc, char **argv ) {
+    sns_init();
     memset(&cx, 0, sizeof(cx));
     cx.dt = .002;
 
