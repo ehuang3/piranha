@@ -109,7 +109,7 @@ pir_start() {
     $SNS run -d -r ft-left -- \
         cftd -f $CAN_L -n 27 -c ft-left -b ft-bias-left -W 1e6
     $SNS run -d -r ft-right -- \
-        cftd -f $CAN_R -n 27 -c ft-right -b ft-bias-right -W 1e6
+        cftd -f $CAN_R -n 27 -c ft-right -b ft-bias-right -W 1e6 -F 500
 
     $SNS run -d -r sdh-left -- \
         sdhiod -b $CAN_SDH_L -c sdhref-left -s sdhstate-left
