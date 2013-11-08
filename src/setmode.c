@@ -192,18 +192,20 @@ int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     return 0;
 }
 
-static int collect_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, size_t off ) {
+static int collect_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double *q0, size_t n ) {
     if( msg_ctrl->n < 8 ) return -1;
     zero_refs(cx);
 
     // free old stuff
     aa_mem_region_release( &cx->modereg );
 
-    rfx_trajq_points_t *points = rfx_trajq_points_alloc( &cx->modereg, 7 );
+    rfx_trajq_points_t *points = rfx_trajq_points_alloc( &cx->modereg, n );
 
-    rfx_trajq_points_add( points, 0, cx->state.q + off );
-    for( size_t i = 0; i + 8 <= msg_ctrl->n; i += 8 ) {
-        rfx_trajq_points_add( points, msg_ctrl->x[i].f, &msg_ctrl->x[i+1].f );
+    double t = 0;
+    rfx_trajq_points_add( points, t, q0 );
+    for( size_t i = 0; i + (n+1) <= msg_ctrl->n; i += (n+1) ) {
+        t +=  msg_ctrl->x[i].f;
+        rfx_trajq_points_add( points, t, &msg_ctrl->x[i+1].f );
     }
 
     cx->trajq_segs = rfx_trajq_gen_pblend_tm1( &cx->modereg, points, 1.0 );
@@ -213,11 +215,11 @@ static int collect_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, size_t off 
 }
 
 int set_mode_trajq_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    return collect_trajq(cx, msg_ctrl, PIR_AXIS_L0 );
+    return collect_trajq(cx, msg_ctrl, cx->state.q + PIR_AXIS_L0, 7 );
 }
 
 int set_mode_trajq_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    return collect_trajq(cx, msg_ctrl, PIR_AXIS_R0 );
+    return collect_trajq(cx, msg_ctrl, cx->state.q + PIR_AXIS_R0, 7 );
 }
 
 int set_mode_trajq_torso(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {

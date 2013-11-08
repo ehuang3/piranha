@@ -354,14 +354,14 @@
 
 (defun pir-trajq-table->store (side)
   (pir-trajq-side side (list (make-trajq-point :q *q-go-l* :time 8d0)
-                             (make-trajq-point :q *q-over-l* :time 16d0)
-                             (make-trajq-point :q *q-up-l* :time 24d0)
-                             (make-trajq-point :q *q-store-l* :time 32d0))))
+                             (make-trajq-point :q *q-over-l* :time 8d0)
+                             (make-trajq-point :q *q-up-l* :time 7d0)
+                             (make-trajq-point :q *q-store-l* :time 5d0))))
 
 (defun pir-trajq-store->table (side)
   (pir-trajq-side side (list (make-trajq-point :q *q-up-l* :time 8d0)
-                             (make-trajq-point :q *q-over-l* :time 18d0)
-                             (make-trajq-point :q *q-go-l* :time 25d0))))
+                             (make-trajq-point :q *q-over-l* :time 10d0)
+                             (make-trajq-point :q *q-go-l* :time 5d0))))
 
 
 (defun pir-pinch (y r)
