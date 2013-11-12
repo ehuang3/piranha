@@ -1,14 +1,5 @@
 Piranha
 
-Force/Torque Sensors
-====================
-* Uses nonstandard protocol (see ATI's docs)
-* Default NODE id is 0x20, conflicts with PDOs for low-numbered CANopen
-  nodes
-* Workaround: set node id to 0x27, so we only conflict with CANopen
-  nodes > 0x70
-
-
 PROGRAMS
 ========
 * pirfilt -- collect state messges from all drivers and combine into one message
@@ -20,6 +11,41 @@ SCRIPTS
 * scripts/piranha-console -- Start joystick daemon and relay messages
 * scripts/piranha-console -- Relate state and control messages
 
+Force/Torque Sensors
+====================
+* Uses nonstandard protocol (see ATI's docs)
+* Default NODE id is 0x20, conflicts with PDOs for low-numbered CANopen
+  nodes
+* Workaround: set node id to 0x27, so we only conflict with CANopen
+  nodes > 0x70
+
+TROUBLESHOOTING
+===============
+
+Are you sure it's plugged in?
+
+SDHs
+----
+SDHs have an RS232 configuration shell.  To access, connect via a
+serial terminal, e.g., `screen /dev/ttyS2 115200` and power cycle the
+hand.  You should get a prompt to press spacebar to enter
+configuration.  The configuration shell can be used to set
+communication parameters, i.e, RS232 or CAN and bitrates.
+
+Note that the DSAs and SDHs share a serial port.
+
+NTCAN_CONTR_ERR_PASSIVE
+-----------------------
+This code usually means one or more of the following:
+* The CAN cable is unplugged
+* A device on the bus is operating at the wrong bitrate
+* The CAN bus is not terminated
+
+LWA4s
+-----
+These arms often lose their encoder offsets.  The script `home.sh` in
+the socanmatic package can be used to reset the home offset to the
+current position.
 
 # Local Variables:
 #   mode: markdown
