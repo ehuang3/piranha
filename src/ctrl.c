@@ -178,8 +178,9 @@ static void ctrl_trajq_lr( pirctrl_cx_t *cx, rfx_ctrl_t *G, size_t off ) {
     double t = aa_tm_timespec2sec( aa_tm_sub( cx->now, cx->t0 ) );
 
     // don't go past the end
-    if( t >= cx->trajq_segs->t_f ) {
-        t = cx->trajq_segs->t_f;
+    double t_f = rfx_trajq_seg_list_get_t_f(cx->trajq_segs);
+    if( t >= t_f ) {
+        t = t_f;
         pir_complete(cx);
     }
 

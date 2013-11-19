@@ -203,7 +203,7 @@ typedef struct {
     aa_mem_region_t modereg;
     rfx_trajx_t *trajx;
     rfx_trajq_t *trajq;
-    rfx_trajq_seg_list_t *trajq_segs;
+    struct rfx_trajq_seg_list *trajq_segs;
 
     struct timespec now;
     rfx_ctrl_t G_L;

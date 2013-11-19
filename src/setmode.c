@@ -199,7 +199,7 @@ static int collect_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double *q0,
     // free old stuff
     aa_mem_region_release( &cx->modereg );
 
-    rfx_trajq_points_t *points = rfx_trajq_points_alloc( &cx->modereg, n );
+    struct rfx_trajq_points *points = rfx_trajq_points_alloc( &cx->modereg, n );
 
     double t = 0;
     rfx_trajq_points_add( points, t, q0 );
