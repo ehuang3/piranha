@@ -127,6 +127,18 @@ enum pir_axis {
     PIR_AXIS_CNT =     29
 };
 
+
+#define PIR_SIDE_INDICES( side, lwa, sdh )      \
+    {                                           \
+        if( PIR_LEFT == (side) ) {              \
+            (lwa) = PIR_AXIS_L0;                \
+            (sdh) = PIR_AXIS_SDH_L0;            \
+        } else if( PIR_RIGHT == (side) ) {      \
+            (lwa) = PIR_AXIS_R0;                \
+            (sdh) = PIR_AXIS_SDH_R0;            \
+        } else { assert(0); }                   \
+    }
+
 // TODO: all transforms, jacobians, forces, in global frame
 
 struct pir_state {

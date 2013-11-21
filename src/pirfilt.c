@@ -68,22 +68,17 @@ typedef struct {
     ach_channel_t chan_sdhstate_right;
 
 
-    double F_raw_L[6]; ///< raw F/T reading, left
-    double F_raw_R[6]; ///< raw F/T reading, right
+    double F_raw[2][6]; ///< raw F/T reading, left
 
     double r_ft_rel[4];  ///< Rotation from E.E. to F/T
-    double S_eer_L[8];   ///< Relative End-effector TF
-    double S_eer_R[8];   ///< Relative End-effector TF
+    double S_eer[2][8];   ///< Relative End-effector TF
 
-    double r_ft_L[4];    ///< Absolute F/T rotation
-    double r_ft_R[4];    ///< Absolute F/T rotation
-
+    double r_ft[2][4];    ///< Absolute F/T rotation
 
     struct pir_state state;
     struct timespec now;
 
-    //double See[8];
-    double S0[8];
+    double S0[2][8];
 
     sig_atomic_t rebias;
 } cx_t;
@@ -106,8 +101,12 @@ int main( int argc, char **argv ) {
 
     assert( aa_tf_isrotmat( tf_0 ) );
 
-    //aa_tf_tfmat2duqu( tf_ident, cx.See );
-    aa_tf_tfmat2duqu( tf_0, cx.S0 );
+    {
+        aa_tf_tfmat2duqu( tf_0, cx.S0[PIR_LEFT] );
+        double Sx[8];
+        aa_tf_xxyz2duqu( M_PI, 0,0,0, Sx );
+        aa_tf_duqu_mul( cx.S0[PIR_LEFT], Sx, cx.S0[PIR_RIGHT] );
+    }
 
 
     /*-- args --*/
@@ -311,8 +310,8 @@ static void update(void) {
     is_updated = is_updated || u_sl || u_sr || u_t;
 
     // force-torque
-    int u_fl = update_ft( cx.F_raw_L, &cx.chan_ft_left, &timeout );
-    int u_fr = update_ft( cx.F_raw_R, &cx.chan_ft_right, &timeout );
+    int u_fl = update_ft( cx.F_raw[PIR_LEFT], &cx.chan_ft_left, &timeout );
+    int u_fr = update_ft( cx.F_raw[PIR_RIGHT], &cx.chan_ft_right, &timeout );
 
 
     is_updated = is_updated || u_fl || u_fr;
@@ -355,17 +354,21 @@ static void update(void) {
 }
 
 static int kinematics( void ) {
+    int side = PIR_LEFT;
+    int sdh, lwa;
+    PIR_SIDE_INDICES(side, lwa, sdh );
+
     /*-- Hand --*/
     {
         double y1, y2;
         rfx_kin_2d2_fk( SDH_L1, SDH_L2,
-                        cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L0],
-                        cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_L1],
+                        cx.state.q[sdh + PIR_SDH_L0],
+                        cx.state.q[sdh + PIR_SDH_L1],
                         NULL,
                         &y1 );
         rfx_kin_2d2_fk( SDH_L1, SDH_L2,
-                        cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R0],
-                        cx.state.q[PIR_AXIS_SDH_L0 + PIR_SDH_R1],
+                        cx.state.q[sdh + PIR_SDH_R0],
+                        cx.state.q[sdh + PIR_SDH_R1],
                         NULL,
                         &y2 );
         // add F/T, SDH, Fingers to S_ee
@@ -380,16 +383,16 @@ static int kinematics( void ) {
 
 
     /*-- Arm --*/
-    lwa4_kin_duqu( &cx.state.q[PIR_AXIS_L0], cx.S0, aa_tf_duqu_ident,
+    lwa4_kin_duqu( &cx.state.q[lwa], cx.S0[side], aa_tf_duqu_ident,
                    cx.state.S_wp_L, cx.state.J_wp_L  );
 
     /*-- F/T --*/
     //double r_arm[4];
     //aa_tf_qmulc( cx.state.S_L, cx.S_eer_L, r_arm );
-    aa_tf_qmul( cx.state.S_wp_L, cx.r_ft_rel, cx.r_ft_L );
+    aa_tf_qmul( cx.state.S_wp_L, cx.r_ft_rel, cx.r_ft[side] );
     // rotate
-    aa_tf_qrot( cx.r_ft_L, cx.F_raw_L,   cx.state.F_L);
-    aa_tf_qrot( cx.r_ft_L, cx.F_raw_L+3, cx.state.F_L+3 );
+    aa_tf_qrot( cx.r_ft[side], cx.F_raw[side],   cx.state.F_L);
+    aa_tf_qrot( cx.r_ft[side], cx.F_raw[side]+3, cx.state.F_L+3 );
     // subtract end-effector mass
     cx.state.F_L[2] = cx.state.F_L[2] - PIR_FT_WEIGHT - SDH_WEIGHT;
 
@@ -415,7 +418,7 @@ static int bias_ft( void ) {
     // F_abs = R_ft * F_ft  => R_ft^T * F_abs = F_ft
 
     double r_ft_inv[4];
-    aa_tf_qconj(cx.r_ft_L, r_ft_inv);
+    aa_tf_qconj(cx.r_ft[PIR_LEFT], r_ft_inv);
     aa_tf_qrot( r_ft_inv, F, msg->x );
     aa_tf_qrot( r_ft_inv, F+3, msg->x+3 );
 
