@@ -83,6 +83,11 @@
 #define SDH_MASS 1.955                    ///< SDH Mass (kilograms)
 #define SDH_WEIGHT (SDH_MASS*AA_K_STD_G)  ///< SDH Weight (Newton)
 
+typedef enum pir_side  {
+    PIR_LEFT,
+    PIR_RIGHT
+} pir_side_t;
+
 enum pir_axis {
 
     PIR_AXIS_T  =       0,
@@ -208,6 +213,7 @@ typedef struct {
     struct timespec now;
     rfx_ctrl_t G_L;
     rfx_ctrl_t G_R;
+    rfx_ctrl_t G_LR;
     rfx_ctrl_t G_T;
     rfx_ctrl_ws_lin_k_t Kx;
     rfx_ctrlq_lin_k_t Kq;
@@ -242,6 +248,7 @@ int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_trajq_lr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq_torso(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 
 
@@ -260,11 +267,13 @@ void ctrl_step( pirctrl_cx_t *cx );
 void ctrl_trajx( pirctrl_cx_t *cx );
 void ctrl_trajq_left( pirctrl_cx_t *cx );
 void ctrl_trajq_right( pirctrl_cx_t *cx );
+void ctrl_trajq_lr( pirctrl_cx_t *cx );
 void ctrl_trajq_torso( pirctrl_cx_t *cx );
 
 
-int sdh_zero( pirctrl_cx_t *cx, struct pir_msg * );
-int sdh_set( pirctrl_cx_t *cx, struct pir_msg * );
-int sdh_pinch( pirctrl_cx_t *cx, struct pir_msg * );
+int sdh_pinch_left( pirctrl_cx_t *cx, struct pir_msg * );
+int sdh_pinch_right( pirctrl_cx_t *cx, struct pir_msg * );
+int sdh_set_left( pirctrl_cx_t *cx, struct pir_msg * );
+int sdh_set_right( pirctrl_cx_t *cx, struct pir_msg * );
 
 #endif //PIRANHA_H

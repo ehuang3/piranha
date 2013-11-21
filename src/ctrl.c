@@ -174,7 +174,7 @@ void ctrl_trajx( pirctrl_cx_t *cx ) {
 
 }
 
-static void ctrl_trajq_lr( pirctrl_cx_t *cx, rfx_ctrl_t *G, size_t off ) {
+static void ctrl_trajq_doit( pirctrl_cx_t *cx, rfx_ctrl_t *G, size_t off ) {
     double t = aa_tm_timespec2sec( aa_tm_sub( cx->now, cx->t0 ) );
 
     // don't go past the end
@@ -195,11 +195,16 @@ static void ctrl_trajq_lr( pirctrl_cx_t *cx, rfx_ctrl_t *G, size_t off ) {
 
 }
 void ctrl_trajq_left( pirctrl_cx_t *cx ) {
-    ctrl_trajq_lr( cx, &cx->G_L, PIR_AXIS_L0 );
+    ctrl_trajq_doit( cx, &cx->G_L, PIR_AXIS_L0 );
 }
 
 void ctrl_trajq_right( pirctrl_cx_t *cx ) {
-    ctrl_trajq_lr( cx, &cx->G_R, PIR_AXIS_R0 );
+    ctrl_trajq_doit( cx, &cx->G_R, PIR_AXIS_R0 );
+}
+
+void ctrl_trajq_lr( pirctrl_cx_t *cx ) {
+    _Static_assert( PIR_AXIS_L0 + 7 == PIR_AXIS_R0, "Invalid axis ordering" );
+    ctrl_trajq_doit( cx, &cx->G_LR, PIR_AXIS_L0 );
 }
 
 void ctrl_trajq_torso( pirctrl_cx_t *cx ) {

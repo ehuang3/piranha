@@ -193,7 +193,7 @@ int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 }
 
 static int collect_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double *q0, size_t n ) {
-    if( msg_ctrl->n < 8 ) return -1;
+    if( msg_ctrl->n < n+1 ) return -1;
     zero_refs(cx);
 
     // free old stuff
@@ -206,6 +206,8 @@ static int collect_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double *q0,
     for( size_t i = 0; i + (n+1) <= msg_ctrl->n; i += (n+1) ) {
         t +=  msg_ctrl->x[i].f;
         rfx_trajq_points_add( points, t, &msg_ctrl->x[i+1].f );
+        printf("t: ");
+        aa_dump_vec(stdout, &msg_ctrl->x[i+1].f, n );
     }
 
     cx->trajq_segs = rfx_trajq_gen_pblend_tm1( &cx->modereg, points, 1.0 );
@@ -220,6 +222,11 @@ int set_mode_trajq_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 
 int set_mode_trajq_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     return collect_trajq(cx, msg_ctrl, cx->state.q + PIR_AXIS_R0, 7 );
+}
+
+int set_mode_trajq_lr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    _Static_assert(  PIR_AXIS_L0 + 7 == PIR_AXIS_R0, "Invalid axis ordering" );
+    return collect_trajq(cx, msg_ctrl, cx->state.q + PIR_AXIS_L0, 14 );
 }
 
 int set_mode_trajq_torso(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {

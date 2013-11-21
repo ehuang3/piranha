@@ -111,17 +111,23 @@ struct pir_mode_desc mode_desc[] = {
     {"trajq-right",
      set_mode_trajq_right,
      ctrl_trajq_right},
+    {"trajq-lr",
+     set_mode_trajq_lr,
+     ctrl_trajq_lr},
     {"trajq-torso",
      set_mode_trajq_torso,
      ctrl_trajq_torso},
-    {"sdh-zero",
-     sdh_zero,
+    {"sdh-set-left",
+     sdh_set_left,
      NULL},
-    {"sdh-set",
-     sdh_set,
+    {"sdh-set-right",
+     sdh_set_left,
      NULL},
-    {"pinch",
-     sdh_pinch,
+    {"pinch-left",
+     sdh_pinch_left,
+     NULL},
+    {"pinch-right",
+     sdh_pinch_right,
      NULL},
     {"k-pt",
      set_mode_k_pt,
@@ -220,6 +226,28 @@ int main( int argc, char **argv ) {
         cx.G_R.x_max[i] = 10;
     }
     cx.G_R.F_max = 20;
+
+    // LEFT_RIGHT
+    _Static_assert( PIR_AXIS_L0 + 7 == PIR_AXIS_R0, "Invalid axis ordering" );
+    cx.G_LR.n_q = 14;
+    //cx.G_R.J =  cx.state.J_wp_R;
+    cx.G_LR.act.q =  &cx.state.q[PIR_AXIS_L0];
+    cx.G_LR.act.dq = &cx.state.dq[PIR_AXIS_L0];
+    //cx.G_R.act.S = cx.state.S_wp_R;
+    //cx.G_R.act.F = cx.state.F_R;
+    cx.G_LR.ref.q =  &cx.ref.q[PIR_AXIS_L0];
+    cx.G_LR.ref.dq = &cx.ref.dq[PIR_AXIS_L0];
+    cx.G_LR.q_min = &cx.q_min[PIR_AXIS_L0];
+    cx.G_LR.q_max = &cx.q_max[PIR_AXIS_L0];
+    //cx.G_R.ref.S = AA_NEW0_AR( double, 8 );
+    //cx.G_R.ref.F = AA_NEW0_AR( double, 6 );
+    //cx.G_R.ref.dx = AA_NEW0_AR( double, 6 );
+    //cx.G_R.act.dx = AA_NEW0_AR( double, 6 );
+    //for( size_t i = 0; i < 3; i ++ ) {
+        //cx.G_R.x_min[i] = -10;
+        //cx.G_R.x_max[i] = 10;
+    //}
+    //cx.G_R.F_max = 20;
 
     // torso
     cx.G_T.n_q = 1;

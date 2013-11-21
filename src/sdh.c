@@ -55,7 +55,7 @@
 #include "piranha.h"
 
 
-void sdh_pos( pirctrl_cx_t *cx, double x[7])  {
+void sdh_pos( pirctrl_cx_t *cx, pir_side_t side, double x[7])  {
     struct sns_msg_motor_ref *msg = sns_msg_motor_ref_local_alloc( 7 );
     sns_msg_header_fill ( &msg->header );
     msg->mode = SNS_MOTOR_MODE_POS;
@@ -65,31 +65,45 @@ void sdh_pos( pirctrl_cx_t *cx, double x[7])  {
 
     sns_msg_set_time( &msg->header, &cx->now, 5 * 1e9 ); // 5 sec duration
 
-    ach_put( &cx->chan_sdhref_left, msg, sns_msg_motor_ref_size(msg) );
+    switch(side) {
+    case PIR_LEFT:
+        ach_put( &cx->chan_sdhref_left, msg, sns_msg_motor_ref_size(msg) );
+        break;
+    case PIR_RIGHT:
+        ach_put( &cx->chan_sdhref_right, msg, sns_msg_motor_ref_size(msg) );
+        break;
+    }
 }
 
-int sdh_zero( pirctrl_cx_t *cx, struct pir_msg *m )  {
+int sdh_zero( pirctrl_cx_t *cx, pir_side_t side, struct pir_msg *m )  {
     (void) *m;
     double x[7] = {0};
-    sdh_pos(cx, x );
+    sdh_pos( cx, side, x );
     return 0;
 }
 
-int sdh_set( pirctrl_cx_t *cx, struct pir_msg *m )  {
+int sdh_set( pirctrl_cx_t *cx, pir_side_t side, struct pir_msg *m )  {
     (void) *m;
     if ( m->n == 7 ) {
-        sdh_pos(cx, &m->x[0].f );
+        sdh_pos( cx, side, &m->x[0].f );
     }
     return 0;
 }
 
+int sdh_set_left( pirctrl_cx_t *cx, struct pir_msg *m )  {
+    return sdh_set( cx, PIR_LEFT, m );
+}
+
+int sdh_set_right( pirctrl_cx_t *cx, struct pir_msg *m )  {
+    return sdh_set( cx, PIR_RIGHT, m );
+}
 
 void cmd_ring_q(const double *theta, double *q) {
     q[0] = aa_ang_norm_pi( M_PI_2 - theta[0] );
     q[1] = aa_ang_norm_pi( M_PI_2 - q[0] - theta[1] );
 }
 
-int sdh_pinch2( pirctrl_cx_t *cx, double r, double y ) {
+int sdh_pinch2( pirctrl_cx_t *cx, pir_side_t side, double r, double y ) {
 
     double l[2] = {SDH_L1, SDH_L2};
     double x[2] = {SDH_B/2 - r, y};
@@ -116,17 +130,25 @@ int sdh_pinch2( pirctrl_cx_t *cx, double r, double y ) {
     X[PIR_SDH_L1] = q[1];
     X[PIR_SDH_R1] = q[1];
 
-    sdh_pos( cx, X );
+    sdh_pos( cx, side, X );
 
     return 0;
 }
 
-int sdh_pinch( pirctrl_cx_t *cx, struct pir_msg *m )  {
+int sdh_pinch( pirctrl_cx_t *cx, pir_side_t side, struct pir_msg *m )  {
     (void) *m;
     if ( m->n == 2 ) {
         double r = m->x[0].f;
         double y = m->x[1].f;
-        sdh_pinch2( cx, r, y );
+        sdh_pinch2( cx, side, r, y );
     }
     return 0;
+}
+
+int sdh_pinch_left( pirctrl_cx_t *cx, struct pir_msg *m )  {
+    return sdh_pinch(cx, PIR_LEFT, m);
+}
+
+int sdh_pinch_right( pirctrl_cx_t *cx, struct pir_msg *m )  {
+    return sdh_pinch(cx, PIR_RIGHT, m);
 }
