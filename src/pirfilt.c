@@ -378,23 +378,23 @@ static int kinematics( void ) {
         double x = LWA4_L_e + LWA4_FT_L + SDH_LB + (y1+y2)/2;
         aa_tf_xxyz2duqu( -60 * M_PI/180, x, 0, 0, s0 );
         aa_tf_xxyz2duqu( 0, 0, 0, -SDH_FC, s1 );
-        aa_tf_duqu_mul( s0, s1, cx.state.S_eer_L );
+        aa_tf_duqu_mul( s0, s1, cx.state.S_eer[side] );
     }
 
 
     /*-- Arm --*/
     lwa4_kin_duqu( &cx.state.q[lwa], cx.S0[side], aa_tf_duqu_ident,
-                   cx.state.S_wp_L, cx.state.J_wp_L  );
+                   cx.state.S_wp[side], cx.state.J_wp[side]  );
 
     /*-- F/T --*/
     //double r_arm[4];
     //aa_tf_qmulc( cx.state.S_L, cx.S_eer_L, r_arm );
-    aa_tf_qmul( cx.state.S_wp_L, cx.r_ft_rel, cx.r_ft[side] );
+    aa_tf_qmul( cx.state.S_wp[side], cx.r_ft_rel, cx.r_ft[side] );
     // rotate
-    aa_tf_qrot( cx.r_ft[side], cx.F_raw[side],   cx.state.F_L);
-    aa_tf_qrot( cx.r_ft[side], cx.F_raw[side]+3, cx.state.F_L+3 );
+    aa_tf_qrot( cx.r_ft[side], cx.F_raw[side],   cx.state.F[side]);
+    aa_tf_qrot( cx.r_ft[side], cx.F_raw[side]+3, cx.state.F[side]+3 );
     // subtract end-effector mass
-    cx.state.F_L[2] = cx.state.F_L[2] - PIR_FT_WEIGHT - SDH_WEIGHT;
+    cx.state.F[side][2] = cx.state.F[side][2] - PIR_FT_WEIGHT - SDH_WEIGHT;
 
     return 0;
 }

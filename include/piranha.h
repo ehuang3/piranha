@@ -145,17 +145,10 @@ struct pir_state {
     double q[PIR_AXIS_CNT];
     double dq[PIR_AXIS_CNT];
 
-    double F_L[6];
-    double F_R[6];
-
-    double S_wp_L[8];
-    double S_wp_R[8];
-
-    double J_wp_L[7*6];
-    double J_wp_R[7*6];
-
-    double S_eer_L[8];
-    double S_eer_R[8];
+    double F[2][6];
+    double S_wp[2][8];
+    double J_wp[2][7*6];
+    double S_eer[2][8];
 };
 
 void lwa4_kin_( const double *q, const double *T0, const double *Tee, double *T, double *J );
@@ -223,12 +216,12 @@ typedef struct {
     struct rfx_trajq_seg_list *trajq_segs;
 
     struct timespec now;
-    rfx_ctrl_t G_L;
-    rfx_ctrl_t G_R;
+    rfx_ctrl_t G[2];
     rfx_ctrl_t G_LR;
     rfx_ctrl_t G_T;
     rfx_ctrl_ws_lin_k_t Kx;
     rfx_ctrlq_lin_k_t Kq;
+    rfx_ctrlq_lin_k_t Kq_lr;
     rfx_ctrlq_lin_k_t Kq_T;
     double q_min[PIR_AXIS_CNT];
     double q_max[PIR_AXIS_CNT];

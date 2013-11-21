@@ -55,13 +55,11 @@
 #include "piranha.h"
 
 static void zero_refs(pirctrl_cx_t *cx) {
-    AA_MEM_CPY( cx->G_L.ref.S, cx->state.S_wp_L, 8 );
-    AA_MEM_SET( cx->G_L.ref.q, 0, cx->G_L.n_q );
-    AA_MEM_SET( cx->G_L.ref.dq, 0, cx->G_L.n_q );
-
-    AA_MEM_CPY( cx->G_R.ref.S, cx->state.S_wp_R, 8 );
-    AA_MEM_SET( cx->G_R.ref.q, 0, cx->G_R.n_q );
-    AA_MEM_SET( cx->G_R.ref.dq, 0, cx->G_R.n_q );
+    for( int side = 0; side < 2; side++ ) {
+        AA_MEM_CPY( cx->G[side].ref.S, cx->state.S_wp[side], 8 );
+        AA_MEM_SET( cx->G[side].ref.q,  0, cx->G[side].n_q );
+        AA_MEM_SET( cx->G[side].ref.dq, 0, cx->G[side].n_q );
+    }
 }
 
 int set_mode_nop(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
@@ -124,7 +122,7 @@ int set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 
 int set_mode_ws_left_finger(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     zero_refs(cx);
-    aa_tf_duqu_smul( cx->state.S_wp_L, cx->state.S_eer_L, cx->G_L.ref.S );
+    aa_tf_duqu_smul( cx->state.S_wp[PIR_LEFT], cx->state.S_eer[PIR_LEFT], cx->G[PIR_LEFT].ref.S );
     set_mode_cpy(cx,msg_ctrl);
     return 0;
 }
@@ -165,7 +163,7 @@ int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     // initial point
     {
         double S0[8];
-        aa_tf_duqu_mul( cx->state.S_wp_L, cx->state.S_eer_L, S0 );
+        aa_tf_duqu_mul( cx->state.S_wp[PIR_LEFT], cx->state.S_eer[PIR_LEFT], S0 );
         rfx_trajx_add_duqu( pT, 0, S0 );
     }
 

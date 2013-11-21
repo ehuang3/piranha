@@ -92,7 +92,7 @@ int main( int argc, char **argv ) {
 
 void dump(struct pir_state *state) {
     double ql[4], xl[3];
-    aa_tf_duqu2qv( state->S_wp_L, ql, xl );
+    aa_tf_duqu2qv( state->S_wp[PIR_LEFT], ql, xl );
     printf("xl: "); aa_dump_vec( stdout, xl, 3 );
 
 }

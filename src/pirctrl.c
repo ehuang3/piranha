@@ -186,46 +186,30 @@ int main( int argc, char **argv ) {
         cx.q_min[i] = -2*M_PI;
         cx.q_max[i] = M_PI;
     }
-    // left
-    cx.G_L.n_q = 7;
-    cx.G_L.J =  cx.state.J_wp_L;
-    cx.G_L.act.q =  &cx.state.q[PIR_AXIS_L0];
-    cx.G_L.act.dq = &cx.state.dq[PIR_AXIS_L0];
-    cx.G_L.act.S = cx.state.S_wp_L;
-    cx.G_L.act.F = cx.state.F_L;
-    cx.G_L.ref.q =  &cx.ref.q[PIR_AXIS_L0];
-    cx.G_L.ref.dq = &cx.ref.dq[PIR_AXIS_L0];
-    cx.G_L.q_min = &cx.q_min[PIR_AXIS_L0];
-    cx.G_L.q_max = &cx.q_max[PIR_AXIS_L0];
-    cx.G_L.ref.S = AA_NEW0_AR( double, 8 );
-    cx.G_L.ref.F = AA_NEW0_AR( double, 6 );
-    cx.G_L.ref.dx = AA_NEW0_AR( double, 6 );
-    cx.G_L.act.dx = AA_NEW0_AR( double, 6 );
-    for( size_t i = 0; i < 3; i ++ ) {
-        cx.G_L.x_min[i] = -10;
-        cx.G_L.x_max[i] = 10;
+    // left/right controller
+    for( int side = 0; side < 2; side++ ) {
+        int lwa, sdh;
+        PIR_SIDE_INDICES(side, lwa, sdh);
+        cx.G[side].n_q = 7;
+        cx.G[side].J =  cx.state.J_wp[side];
+        cx.G[side].act.q =  &cx.state.q[lwa];
+        cx.G[side].act.dq = &cx.state.dq[lwa];
+        cx.G[side].act.S = cx.state.S_wp[side];
+        cx.G[side].act.F = cx.state.F[side];
+        cx.G[side].ref.q =  &cx.ref.q[lwa];
+        cx.G[side].ref.dq = &cx.ref.dq[lwa];
+        cx.G[side].q_min = &cx.q_min[lwa];
+        cx.G[side].q_max = &cx.q_max[lwa];
+        cx.G[side].ref.S = AA_NEW0_AR( double, 8 );
+        cx.G[side].ref.F = AA_NEW0_AR( double, 6 );
+        cx.G[side].ref.dx = AA_NEW0_AR( double, 6 );
+        cx.G[side].act.dx = AA_NEW0_AR( double, 6 );
+        for( size_t i = 0; i < 3; i ++ ) {
+            cx.G[side].x_min[i] = -10;
+            cx.G[side].x_max[i] = 10;
+        }
+        cx.G[side].F_max = 20;
     }
-    cx.G_L.F_max = 20;
-    // right
-    cx.G_R.n_q = 7;
-    cx.G_R.J =  cx.state.J_wp_R;
-    cx.G_R.act.q =  &cx.state.q[PIR_AXIS_R0];
-    cx.G_R.act.dq = &cx.state.dq[PIR_AXIS_R0];
-    cx.G_R.act.S = cx.state.S_wp_R;
-    cx.G_R.act.F = cx.state.F_R;
-    cx.G_R.ref.q =  &cx.ref.q[PIR_AXIS_R0];
-    cx.G_R.ref.dq = &cx.ref.dq[PIR_AXIS_R0];
-    cx.G_R.q_min = &cx.q_min[PIR_AXIS_R0];
-    cx.G_R.q_max = &cx.q_max[PIR_AXIS_R0];
-    cx.G_R.ref.S = AA_NEW0_AR( double, 8 );
-    cx.G_R.ref.F = AA_NEW0_AR( double, 6 );
-    cx.G_R.ref.dx = AA_NEW0_AR( double, 6 );
-    cx.G_R.act.dx = AA_NEW0_AR( double, 6 );
-    for( size_t i = 0; i < 3; i ++ ) {
-        cx.G_R.x_min[i] = -10;
-        cx.G_R.x_max[i] = 10;
-    }
-    cx.G_R.F_max = 20;
 
     // LEFT_RIGHT
     _Static_assert( PIR_AXIS_L0 + 7 == PIR_AXIS_R0, "Invalid axis ordering" );
@@ -295,6 +279,10 @@ int main( int argc, char **argv ) {
     cx.Kq.p = AA_NEW_AR( double, 7 );
     AA_MEM_SET( cx.Kq.p, 0, 7 );
 
+    cx.Kq_lr.n_q = 14;
+    cx.Kq_lr.p = AA_NEW_AR( double, 14 );
+    AA_MEM_SET( cx.Kq_lr.p, 0, 14 );
+
     cx.Kq_T.n_q = 1;
     cx.Kq_T.p = AA_NEW_AR( double, 1 );
     AA_MEM_SET( cx.Kq_T.p, 0, 1 );
@@ -361,12 +349,13 @@ static void update(void) {
             if( msg->n == JS_AXES &&
                 frame_size == sns_msg_joystick_size(msg) )
             {
-                if( msg->buttons & GAMEPAD_BUTTON_BACK ) {
+                if( msg->buttons & GAMEPAD_BUTTON_B ) {
                     if( strcmp(cx.msg_ctrl.mode, "halt") ) {
                         printf("HALT\n");
                     }
                     strcpy( cx.msg_ctrl.mode, "halt" );
                     memset(cx.ref.user, 0, sizeof(cx.ref.user[0])*JS_AXES);
+                    cx.mode = NULL;
                 } else {
                     memcpy(cx.ref.user, msg->axis, sizeof(cx.ref.user[0])*msg->n);
                     cx.ref.user_button = msg->buttons;
