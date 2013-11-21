@@ -17,7 +17,7 @@ int main(void) {
     double T_rel[3*4*7] = {0};
     double T_abs[3*4*7] = {0};
     double J[6*7];
-    double J2[6*7];
+    //double J2[6*7];
     double Te[3*4];
 
     double axis[][3] = { {-1,0,0},   /* 01 */
@@ -68,12 +68,12 @@ int main(void) {
         rfx_kin_tf_jac_rev( 7, T_abs, axis[0], Te, J, 6 );
     aa_tock();
 
-    aa_tick("numeric-all: ");
-    for( size_t i = 0; i < N; i ++ )
-        lwa4_kin2_( q, aa_tf_ident, aa_tf_ident, Te, J );
-    aa_tock();
-    aa_dump_mat(stdout, Te, 3, 4);
-    printf("\n");
+    /* aa_tick("numeric-all: "); */
+    /* for( size_t i = 0; i < N; i ++ ) */
+    /*     lwa4_kin2_( q, aa_tf_ident, aa_tf_ident, Te, J ); */
+    /* aa_tock(); */
+    /* aa_dump_mat(stdout, Te, 3, 4); */
+    /* printf("\n"); */
 
     double S_rel[8*7];
     double S_abs[8*7];

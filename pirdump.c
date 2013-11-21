@@ -54,8 +54,6 @@
 #include <reflex.h>
 #include "piranha.h"
 
-void dump(struct pir_state *state);
-
 int main( int argc, char **argv ) {
 
     ach_channel_t chan;
@@ -72,6 +70,7 @@ int main( int argc, char **argv ) {
     // state
     /* -- RUN -- */
     while (!sns_cx.shutdown) {
+    {
         struct pir_state state;
         size_t frame_size;
         ach_status_t r = ach_get( &chan, &state, sizeof(state), &frame_size,
@@ -79,7 +78,6 @@ int main( int argc, char **argv ) {
         switch(r) {
         case ACH_OK:
         case ACH_MISSED_FRAME:
-            dump(&state);
         case ACH_CANCELED:
         case ACH_TIMEOUT:
         case ACH_STALE_FRAMES:
@@ -88,11 +86,4 @@ int main( int argc, char **argv ) {
             SNS_LOG(LOG_ERR, "Failed to get frame: %s\n", ach_result_to_string(r) );
         }
     }
-}
-
-void dump(struct pir_state *state) {
-    double ql[4], xl[3];
-    aa_tf_duqu2qv( state->S_wp_L, ql, xl );
-    printf("xl: "); aa_dump_vec( stdout, xl, 3 );
-
 }
