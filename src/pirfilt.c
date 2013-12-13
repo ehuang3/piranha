@@ -103,9 +103,9 @@ int main( int argc, char **argv ) {
 
     {
         aa_tf_tfmat2duqu( tf_0, cx.S0[PIR_LEFT] );
-        double Sx[8];
-        aa_tf_xxyz2duqu( M_PI, 0,0,0, Sx );
-        aa_tf_duqu_mul( cx.S0[PIR_LEFT], Sx, cx.S0[PIR_RIGHT] );
+        double Srel[8] = {0};
+        aa_tf_zangle2quat( M_PI, Srel );
+        aa_tf_duqu_mul( Srel, cx.S0[PIR_LEFT], cx.S0[PIR_RIGHT] );
     }
 
 
@@ -357,6 +357,18 @@ static int kinematics( void ) {
     int side = PIR_LEFT;
     int sdh, lwa;
     PIR_SIDE_INDICES(side, lwa, sdh );
+    (void)lwa;
+
+    /*-- Arm --*/
+    for( size_t i = 0; i < 2; i ++ ) {
+        int j, k;
+        PIR_SIDE_INDICES(i, j, k);
+        (void)k;
+        lwa4_kin_duqu( &cx.state.q[j], cx.S0[i], aa_tf_duqu_ident,
+                       cx.state.S_wp[i], cx.state.J_wp[i]  );
+        double x[3];
+        aa_tf_duqu_trans( cx.state.S_wp[i], x );
+    }
 
     /*-- Hand --*/
     {
@@ -380,11 +392,6 @@ static int kinematics( void ) {
         aa_tf_xxyz2duqu( 0, 0, 0, -SDH_FC, s1 );
         aa_tf_duqu_mul( s0, s1, cx.state.S_eer[side] );
     }
-
-
-    /*-- Arm --*/
-    lwa4_kin_duqu( &cx.state.q[lwa], cx.S0[side], aa_tf_duqu_ident,
-                   cx.state.S_wp[side], cx.state.J_wp[side]  );
 
     /*-- F/T --*/
     //double r_arm[4];
