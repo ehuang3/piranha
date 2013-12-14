@@ -105,16 +105,25 @@
   q-r       ; right joints
   q-sdh-l   ; left sdh joints
   q-sdh-r   ; left sdh joints
-  s-l       ; left pose quaternion
-  s-r       ; right pose quaternion
-  s-eer-l   ; left end-effector relative
-  s-eer-r   ; right end-effector relative
-  s-f-l     ; left finger
-  s-f-r     ; right finger
-  r-l       ; left rotion quaternion
-  r-r       ; right rotion quaternion
-  x-l       ; left translation vector
-  x-r       ; right translation vector
+
+  ;; s-l       ; left pose quaternion
+  ;; s-r       ; right pose quaternion
+  ;; s-eer-l   ; left end-effector relative
+  ;; s-eer-r   ; right end-effector relative
+  ;; s-f-l     ; left finger
+  ;; s-f-r     ; right finger
+  ;; r-l       ; left rotion quaternion
+  ;; r-r       ; right rotion quaternion
+  ;; x-l       ; left translation vector
+  ;; x-r       ; right translation vector
+
+  (e-l (aa::make-quaternion-translation) :type aa::quaternion-translation)
+  (e-r (aa::make-quaternion-translation) :type aa::quaternion-translation)
+  (e-eer-l (aa::make-quaternion-translation) :type aa::quaternion-translation)
+  (e-eer-r (aa::make-quaternion-translation) :type aa::quaternion-translation)
+  (e-f-l (aa::make-quaternion-translation) :type aa::quaternion-translation)
+  (e-f-r (aa::make-quaternion-translation) :type aa::quaternion-translation)
+
   f-l
   f-r
   )
@@ -132,16 +141,16 @@
     (ach:get-pointer *state-channel* state (foreign-type-size '(:struct pir-cstate))
                      :wait t :last t)
     (labels ((extract (x n)
-               (read-doubles (foreign-slot-pointer state '(:struct pir-cstate) x) n)))
-      (let ((s-l (aa::make-dual-quaternion :data (extract 's-l 8)))
-            (s-r (aa::make-dual-quaternion :data (extract 's-r 8)))
-            (s-eer-l (aa::make-dual-quaternion :data (extract 's-eer-l 8)))
-            (s-eer-r (aa::make-dual-quaternion :data (extract 's-eer-r 8)))
+               (read-doubles (foreign-slot-pointer state '(:struct pir-cstate) x) n))
+             (extract-qutr (x)
+               (aa::tf-duqu2qutr (aa::make-dual-quaternion :data (extract x 8)))))
+      (let ((e-l (extract-qutr 's-l))
+            (e-r (extract-qutr 's-r))
+            (e-eer-l (extract-qutr 's-eer-l))
+            (e-eer-r (extract-qutr 's-eer-r))
             (q (extract 'q 29)))
-        (multiple-value-bind (r-l x-l) (amino::tf-duqu2qv s-l)
-          (multiple-value-bind (r-r x-r) (amino::tf-duqu2qv s-r)
-            (setq *state*
-                  (make-pir-state
+        (setq *state*
+              (make-pir-state
                    :q q
                    :dq (extract 'dq 29)
                    :q-l (amino::vec-copy q :start 1 :end 8)
@@ -150,16 +159,27 @@
                    :q-sdh-r (amino::vec-copy q :start 22 :end 28)
                    :f-l (extract 'f-l 6)
                    :f-r (extract 'f-r 6)
-                   :s-l s-l
-                   :s-r s-r
-                   :s-eer-l s-eer-l
-                   :s-eer-r s-eer-r
-                   :s-f-l (aa::tf-duqu-mul s-l s-eer-l)
-                   :s-f-r (aa::tf-duqu-mul s-r s-eer-r)
-                   :r-l r-l
-                   :r-r r-r
-                   :x-l x-l
-                   :x-r x-r))))))))
+
+                   :e-l e-l
+                   :e-r e-r
+                   :e-eer-l e-eer-l
+                   :e-eer-r e-eer-r
+                   :e-f-l (aa::tf-qutr-mul e-l e-eer-l)
+                   :e-f-r (aa::tf-qutr-mul e-r e-eer-r)
+
+                   ;; :s-l s-l
+                   ;; :s-r s-r
+                   ;; :s-eer-l s-eer-l
+                   ;; :s-eer-r s-eer-r
+                   ;; :s-f-l (aa::tf-duqu-mul s-l s-eer-l)
+                   ;; :s-f-r (aa::tf-duqu-mul s-r s-eer-r)
+
+                   ;; :r-l r-l
+                   ;; :r-r r-r
+                   ;; :x-l x-l
+                   ;; :x-r x-r
+
+                   ))))))
 
 (defun pir-set-mode (msg mode)
   (assert (< (length mode) 63))
@@ -235,7 +255,7 @@
 
 (defun pir-go (points &key
                (state (get-state)))
-  (setq *last-traj* (append (list (make-trajx-point :pose (pir-state-s-l state)
+  (setq *last-traj* (append (list (make-trajx-point :pose (aa::tf-qutr2duqu (pir-state-e-l state))
                                                     :time 0d0))
                             points))
   (pir-message "trajx" (trajx-point-data points)))
@@ -251,13 +271,13 @@
                    (x 0d0)
                    (y 0d0)
                    (z 0d0)
-                   (xyz (amino::col-vector x y z))
+                   (xyz (amino::vec3 x y z))
                    (time 5d0)
                    (r amino::+tf-quat-ident+))
   (let ((state (get-state)))
-    (let* ((S-rel (amino::tf-qv2duqu r xyz))
-           (S-1 (amino::tf-duqu-mul (pir-state-s-f-l state) S-rel)))
-      (pir-go (list (make-trajx-point :pose S-1
+    (let* ((e-rel (aa::make-quaternion-translation :quaternion r :translation xyz))
+           (e-1 (amino::tf-qutr-mul (pir-state-e-f-l state) e-rel)))
+      (pir-go (list (make-trajx-point :pose (aa::tf-qutr2duqu e-1)
                                       :time time))
               :state state))))
 
@@ -269,7 +289,8 @@
 (defun pir-rotate (r &key (time 10d0))
   (let ((state (get-state)))
     (pir-go (list (make-trajx-point :pose (amino::tf-qv2duqu r
-                                                             (aa::tf-duqu-trans (pir-state-s-f-l state)))
+                                                             (aa::quaternion-translation-translation
+                                                              (pir-state-e-f-l state)))
                                     :time time))
             :state state)))
 
@@ -342,9 +363,15 @@
 (defparameter *q-store-l* (aa::vec (* 0.5 pi) (* -0.5 pi) 0 0 0 0 0))
 (defparameter *q-up-l* (aa::vec (* 0.5 pi) (* -0.2 pi) 0 (* -0.2 pi) 0 (* .55 pi) 0))
 (defparameter *q-over-l* (aa::vec (* 0.1 pi) (* -0.2 pi) 0 (* -0.2 pi) 0 (* .55 pi) 0))
-(defparameter *q-go-l* (aa::vec 0.7729539658307287d0 -1.0176316736678137d0 -0.9906488834319814d0
-                                -1.4043966359097573d0 -0.8265181205744347d0 1.306605837920515d0
-                                -0.07307693578100258d0))
+(defparameter *q-go-l* (aa::vec 0.7095810606908146d0 -0.9248150640467554d0 -0.8247204314448805d0
+                                -1.4530564154553591d0 -0.9698096521631692d0 1.3412331702800824d0
+                                0.5472479869628221d0))
+
+(defun pir-mirror-l->r (q)
+  (let ((v (aa::g* -1d0 q)))
+    (incf (aref v 6)
+          (* -1 (/ 60d0 180) pi)) ;; TODO: check this value
+    v))
 
 (defun pir-trajq-side-point (side point)
   (ecase side
@@ -352,7 +379,7 @@
     (:right (make-trajq-point :q (aa::g* -1d0 (trajq-point-q point))
                               :time (trajq-point-time point)))
     (:lr (make-trajq-point :q (aa::veccat (trajq-point-q point)
-                                          (aa::g* -1d0 (trajq-point-q point)))
+                                          (pir-mirror-l->r (trajq-point-q point)))
                            :time (trajq-point-time point)))))
 
 
@@ -397,10 +424,10 @@
 (defun pir-zero (side &optional (time 5d0))
   (pir-set side *q-zero* :time time))
 
-(defun pir-pose ()
-  (let ((s (pir-state-s-f-l (get-state))))
-    (values s
-            (aa::tf-duqu-trans s))))
+;; (defun pir-pose ()
+;;   (let ((s (pir-state-s-f-l (get-state))))
+;;     (values s
+;;             (aa::tf-duqu-trans s))))
 
 
 (defun xyz2duqu (x y z)

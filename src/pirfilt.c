@@ -61,8 +61,7 @@ typedef struct {
     ach_channel_t chan_state_right;
     ach_channel_t chan_ft_left;
     ach_channel_t chan_ft_right;
-    ach_channel_t chan_ftbias_left;
-    ach_channel_t chan_ftbias_right;
+    ach_channel_t chan_ftbias[2];
     ach_channel_t chan_state_pir;
     ach_channel_t chan_sdhstate_left;
     ach_channel_t chan_sdhstate_right;
@@ -129,8 +128,8 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_sdhstate_right, "sdhstate-right", NULL );
     sns_chan_open( &cx.chan_ft_left,      "ft-left",  NULL );
     sns_chan_open( &cx.chan_ft_right,     "ft-right", NULL );
-    sns_chan_open( &cx.chan_ftbias_left,  "ft-bias-left",  NULL );
-    sns_chan_open( &cx.chan_ftbias_right, "ft-bias-right", NULL );
+    sns_chan_open( &cx.chan_ftbias[PIR_LEFT],  "ft-bias-left",  NULL );
+    sns_chan_open( &cx.chan_ftbias[PIR_RIGHT], "ft-bias-right", NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",  NULL );
 
     {
@@ -354,54 +353,40 @@ static void update(void) {
 }
 
 static int kinematics( void ) {
-    int side = PIR_LEFT;
-    int sdh, lwa;
-    PIR_SIDE_INDICES(side, lwa, sdh );
-    (void)lwa;
-
-    /*-- Arm --*/
     for( size_t i = 0; i < 2; i ++ ) {
         int j, k;
         PIR_SIDE_INDICES(i, j, k);
-        (void)k;
+        /*-- Arm --*/
         lwa4_kin_duqu( &cx.state.q[j], cx.S0[i], aa_tf_duqu_ident,
                        cx.state.S_wp[i], cx.state.J_wp[i]  );
-        double x[3];
-        aa_tf_duqu_trans( cx.state.S_wp[i], x );
-    }
 
     /*-- Hand --*/
-    {
         double y1, y2;
         rfx_kin_2d2_fk( SDH_L1, SDH_L2,
-                        cx.state.q[sdh + PIR_SDH_L0],
-                        cx.state.q[sdh + PIR_SDH_L1],
+                        cx.state.q[k + PIR_SDH_L0],
+                        cx.state.q[k + PIR_SDH_L1],
                         NULL,
                         &y1 );
         rfx_kin_2d2_fk( SDH_L1, SDH_L2,
-                        cx.state.q[sdh + PIR_SDH_R0],
-                        cx.state.q[sdh + PIR_SDH_R1],
+                        cx.state.q[k + PIR_SDH_R0],
+                        cx.state.q[k + PIR_SDH_R1],
                         NULL,
                         &y2 );
         // add F/T, SDH, Fingers to S_ee
-        /* double v[3] = { LWA4_FT_L + SDH_L0 + (y1+y2/2), 0, SDH_FC}; */
-        /* aa_tf_qv2duqu( aa_tf_quat_ident, v, cx.S_eer_L ); */
         double s0[8], s1[8];
         double x = LWA4_L_e + LWA4_FT_L + SDH_LB + (y1+y2)/2;
         aa_tf_xxyz2duqu( -60 * M_PI/180, x, 0, 0, s0 );
         aa_tf_xxyz2duqu( 0, 0, 0, -SDH_FC, s1 );
-        aa_tf_duqu_mul( s0, s1, cx.state.S_eer[side] );
-    }
+        aa_tf_duqu_mul( s0, s1, cx.state.S_eer[i] );
 
-    /*-- F/T --*/
-    //double r_arm[4];
-    //aa_tf_qmulc( cx.state.S_L, cx.S_eer_L, r_arm );
-    aa_tf_qmul( cx.state.S_wp[side], cx.r_ft_rel, cx.r_ft[side] );
-    // rotate
-    aa_tf_qrot( cx.r_ft[side], cx.F_raw[side],   cx.state.F[side]);
-    aa_tf_qrot( cx.r_ft[side], cx.F_raw[side]+3, cx.state.F[side]+3 );
-    // subtract end-effector mass
-    cx.state.F[side][2] = cx.state.F[side][2] - PIR_FT_WEIGHT - SDH_WEIGHT;
+        /*-- F/T --*/
+        aa_tf_qmul( cx.state.S_wp[i], cx.r_ft_rel, cx.r_ft[i] );
+        // rotate
+        aa_tf_qrot( cx.r_ft[i], cx.F_raw[i],   cx.state.F[i]);
+        aa_tf_qrot( cx.r_ft[i], cx.F_raw[i]+3, cx.state.F[i]+3 );
+        // subtract end-effector mass
+        cx.state.F[i][2] = cx.state.F[i][2] - PIR_FT_WEIGHT - SDH_WEIGHT;
+    }
 
     return 0;
 }
@@ -424,15 +409,17 @@ static int bias_ft( void ) {
     // Rotate force to F/T frame
     // F_abs = R_ft * F_ft  => R_ft^T * F_abs = F_ft
 
-    double r_ft_inv[4];
-    aa_tf_qconj(cx.r_ft[PIR_LEFT], r_ft_inv);
-    aa_tf_qrot( r_ft_inv, F, msg->x );
-    aa_tf_qrot( r_ft_inv, F+3, msg->x+3 );
+    for( size_t i = 0; i < 2; i ++ ) {
+        double r_ft_inv[4];
+        aa_tf_qconj(cx.r_ft[i], r_ft_inv);
+        aa_tf_qrot( r_ft_inv, F, msg->x );
+        aa_tf_qrot( r_ft_inv, F+3, msg->x+3 );
 
-    // send message
-    ach_status_t r = ach_put( &cx.chan_ftbias_left, msg, n_msg );
-    if( ACH_OK != r ) {
-        SNS_LOG( LOG_ERR, "Couldn't send ach frame: %s\n", ach_result_to_string(r) );
+        // send message
+        ach_status_t r = ach_put( &cx.chan_ftbias[i], msg, n_msg );
+        if( ACH_OK != r ) {
+            SNS_LOG( LOG_ERR, "Couldn't send ach frame: %s\n", ach_result_to_string(r) );
+        }
     }
 
     // reset bias flag
