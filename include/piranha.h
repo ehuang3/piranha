@@ -211,7 +211,8 @@ typedef struct {
     struct pir_mode_desc *mode;
     struct timespec t0;
     aa_mem_region_t modereg;
-    rfx_trajx_t *trajx;
+    struct rfx_trajx_seg_list *trajx_segs;
+
     rfx_trajq_t *trajq;
     struct rfx_trajq_seg_list *trajq_segs;
 

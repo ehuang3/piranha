@@ -154,32 +154,27 @@ int set_mode_trajx_side(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, int side ) {
     aa_mem_region_release( &cx->modereg );
 
     // aloc
-    rfx_trajx_parablend_t *T = AA_MEM_REGION_NEW( &cx->modereg, rfx_trajx_parablend_t );
-    rfx_trajx_splend_init( T, &cx->modereg, 1 );
-
-    rfx_trajx_t *pT = (rfx_trajx_t*)T;
+    struct rfx_trajx_point_list *plist = rfx_trajx_point_list_alloc( &cx->modereg );
 
     // initial point
     {
         double S0[8];
-        aa_tf_duqu_mul( cx->state.S_wp[PIR_LEFT], cx->state.S_eer[side], S0 );
-        rfx_trajx_add_duqu( pT, 0, S0 );
+        aa_tf_duqu_mul( cx->state.S_wp[side], cx->state.S_eer[side], S0 );
+        rfx_trajx_point_list_addb_duqu( plist, 0, 1, S0 );
     }
 
     // final point
     for( size_t i = 0; i + 9 <= msg_ctrl->n; i += 9 ) {
         double t = msg_ctrl->x[i].f;
         double *S = &msg_ctrl->x[i+1].f;
-        rfx_trajx_add_duqu( pT, t, S );
-        //printf("i: %d, t: %f: ", i, t); aa_dump_vec( stdout, S, 8 );
+        rfx_trajx_point_list_addb_duqu( plist, t, 1, S );
     }
 
     // generate
-    rfx_trajx_generate( pT );
+    cx->trajx_segs = rfx_trajx_splend_generate( plist, &cx->modereg );
 
     memcpy( &cx->t0, &cx->now, sizeof(cx->t0) );
 
-    cx->trajx = pT;
     return 0;
 }
 

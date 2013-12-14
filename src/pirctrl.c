@@ -196,6 +196,7 @@ int main( int argc, char **argv ) {
     for( int side = 0; side < 2; side++ ) {
         int lwa, sdh;
         PIR_SIDE_INDICES(side, lwa, sdh);
+        (void)sdh;
         cx.G[side].n_q = 7;
         cx.G[side].J =  cx.state.J_wp[side];
         cx.G[side].act.q =  &cx.state.q[lwa];

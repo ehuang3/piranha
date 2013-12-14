@@ -152,21 +152,15 @@ void ctrl_trajx_side( pirctrl_cx_t *cx, int side ) {
     (void)sdh;
 
     double t = aa_tm_timespec2sec( aa_tm_sub( cx->now, cx->t0 ) );
-
+    double t_f = rfx_trajx_seg_list_get_t_f(cx->trajx_segs);
+    if( t > t_f ) {
+        t = t_f;
+        pir_complete(cx);
+    }
 
     // get refs
     double S_traj[8], dx[6] = {0};
-
-    if( t >= cx->trajx->pt_f->t ) {
-        //aa_tf_qv2duqu( cx->trajx->pt_f->r, cx->trajx->pt_f->x, cx->G_L.ref.S );
-        aa_tf_qv2duqu( cx->trajx->pt_f->r, cx->trajx->pt_f->x, S_traj );
-        AA_MEM_SET( cx->G[side].ref.dx, 0, 6 );
-        pir_complete(cx);
-    } else {
-        rfx_trajx_get_x_duqu( cx->trajx, t, S_traj );
-        //rfx_trajx_get_dx( cx->trajx, t, cx->G_L.ref.dx );
-        rfx_trajx_get_dx( cx->trajx, t, dx );
-    }
+    rfx_trajx_seg_list_get_dx_duqu( cx->trajx_segs, t, S_traj, dx );
 
     // convert to wrist frame
     aa_tf_duqu_mulc( S_traj, cx->state.S_eer[side], cx->G[side].ref.S  );
