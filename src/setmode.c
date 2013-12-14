@@ -127,6 +127,13 @@ int set_mode_ws_left_finger(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     return 0;
 }
 
+int set_mode_ws_right_finger(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    zero_refs(cx);
+    aa_tf_duqu_smul( cx->state.S_wp[PIR_RIGHT], cx->state.S_eer[PIR_RIGHT], cx->G[PIR_RIGHT].ref.S );
+    set_mode_cpy(cx,msg_ctrl);
+    return 0;
+}
+
 int set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     zero_refs(cx);
     set_mode_cpy(cx,msg_ctrl);

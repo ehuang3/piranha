@@ -110,6 +110,11 @@ void ctrl_ws_left_finger( pirctrl_cx_t *cx ) {
     ctrl_ws( cx, PIR_AXIS_L0, cx->state.S_wp[PIR_LEFT], cx->state.S_eer[PIR_LEFT], PIR_LEFT );
 }
 
+
+void ctrl_ws_right_finger( pirctrl_cx_t *cx ) {
+    ctrl_ws( cx, PIR_AXIS_R0, cx->state.S_wp[PIR_RIGHT], cx->state.S_eer[PIR_RIGHT], PIR_RIGHT );
+}
+
 void ctrl_sin( pirctrl_cx_t *cx ) {
 
     double k = (cx->ref.user[GAMEPAD_AXIS_LT] + cx->ref.user[GAMEPAD_AXIS_RT]) ;
