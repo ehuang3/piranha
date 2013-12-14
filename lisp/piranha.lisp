@@ -253,21 +253,21 @@
                  :start1 (+ 1 offset) :end1 (+ 9 offset))))
     data))
 
-(defun pir-go (points &key
+(defun pir-go (side points &key
                (state (get-state)))
   (setq *last-traj* (append (list (make-trajx-point :pose (aa::tf-qutr2duqu (pir-state-e-l state))
                                                     :time 0d0))
                             points))
-  (pir-message "trajx" (trajx-point-data points)))
+  (pir-message (side-case side "trajx") (trajx-point-data points)))
 
-(defun pir-go-1 (s &optional (time 10d0))
+(defun pir-go-1 (side s &optional (time 10d0))
   (let ((state (get-state)))
-    (pir-go (list (make-trajx-point :pose s
-                                    :time time))
+    (pir-go side (list (make-trajx-point :pose s
+                                         :time time))
             :state state)))
 
 
-(defun pir-go-rel (&key
+(defun pir-go-rel (side &key
                    (x 0d0)
                    (y 0d0)
                    (z 0d0)
@@ -277,25 +277,29 @@
   (let ((state (get-state)))
     (let* ((e-rel (aa::make-quaternion-translation :quaternion r :translation xyz))
            (e-1 (amino::tf-qutr-mul (pir-state-e-f-l state) e-rel)))
-      (pir-go (list (make-trajx-point :pose (aa::tf-qutr2duqu e-1)
-                                      :time time))
+      (pir-go side (list (make-trajx-point :pose (aa::tf-qutr2duqu e-1)
+                                           :time time))
               :state state))))
 
-(defun pir-screw (x theta &key (time 5d0))
-  (pir-go-rel :x x
+(defun pir-screw (side x theta &key (time 5d0))
+  (pir-go-rel side
+              :x x
               :r (amino::tf-xangle2quat theta)
               :time time))
 
-(defun pir-rotate (r &key (time 10d0))
+(defun pir-rotate (side r &key (time 10d0))
   (let ((state (get-state)))
-    (pir-go (list (make-trajx-point :pose (amino::tf-qv2duqu r
-                                                             (aa::quaternion-translation-translation
-                                                              (pir-state-e-f-l state)))
-                                    :time time))
+    (pir-go side (list (make-trajx-point :pose (amino::tf-qv2duqu r
+                                                                  (aa::quaternion-translation-translation
+                                                                   (ecase side
+                                                                     (:left (pir-state-e-f-l state))
+                                                                     (:right (pir-state-e-f-r state)))))
+                                         :time time))
             :state state)))
 
-(defun pir-zrotate (theta &key (time 10d0))
-  (pir-rotate (aa::tf-qmul (aa::tf-yangle2quat (/ pi 2)) (aa::tf-xangle2quat theta)) :time time))
+(defun pir-zrotate (side theta &key (time 10d0))
+  (pir-rotate side
+              (aa::tf-qmul (aa::tf-yangle2quat (/ pi 2)) (aa::tf-xangle2quat theta)) :time time))
 
 (defstruct trajq-point
   q
@@ -436,8 +440,8 @@
 (defun pose-hover (s z)
   (aa::tf-duqu-mul s
                    (aa::tf-qv2duqu (amino::tf-yangle2quat (/ pi 2)) (aa::vec 0d0 0d0 z))))
-(defun go-grasp (s z0 z1 &key (t0 5d0) (t1 10d0))
-  (pir-go (list (make-trajx-point :pose (pose-hover s z0)
-                                  :time t0)
-                (make-trajx-point :pose (pose-hover s z1)
-                                  :time t1))))
+(defun go-grasp (side s z0 z1 &key (t0 5d0) (t1 10d0))
+  (pir-go side (list (make-trajx-point :pose (pose-hover s z0)
+                                       :time t0)
+                     (make-trajx-point :pose (pose-hover s z1)
+                                       :time t1))))

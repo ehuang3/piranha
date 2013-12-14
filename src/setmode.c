@@ -146,17 +146,9 @@ int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     return 0;
 }
 
-int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+int set_mode_trajx_side(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, int side ) {
     if( msg_ctrl->n < 9 ) return -1;
     zero_refs(cx);
-    /* double *S1 = &msg_ctrl->x[0].f; */
-    /* aa_tf_duqu_cmul( cx->state.S_L, S1, S_rel ); */
-    /* aa_tf_duqu_trans( S_rel, xr ); */
-    /* printf("xrel: "); aa_dump_vec( stdout, xr, 3 ); */
-    /* printf("qrel: "); aa_dump_vec( stdout, S_rel, 4 ); */
-    /* printf("S0: "); aa_dump_vec( stdout, cx->state.S_L, 8 ); */
-    /* printf("S1: "); aa_dump_vec( stdout, S1, 8 ); */
-
 
     // free old stuff
     aa_mem_region_release( &cx->modereg );
@@ -170,7 +162,7 @@ int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     // initial point
     {
         double S0[8];
-        aa_tf_duqu_mul( cx->state.S_wp[PIR_LEFT], cx->state.S_eer[PIR_LEFT], S0 );
+        aa_tf_duqu_mul( cx->state.S_wp[PIR_LEFT], cx->state.S_eer[side], S0 );
         rfx_trajx_add_duqu( pT, 0, S0 );
     }
 
@@ -185,16 +177,19 @@ int set_mode_trajx(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     // generate
     rfx_trajx_generate( pT );
 
-    // debugging plot
-    /* { */
-    /*     struct rfx_trajx_plot_opts xopts = {0}; */
-    /*     xopts.to_file = 1; */
-    /*     rfx_trajx_plot( pT, .001, &xopts ); */
-    /* } */
     memcpy( &cx->t0, &cx->now, sizeof(cx->t0) );
 
     cx->trajx = pT;
     return 0;
+}
+
+
+int set_mode_trajx_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    return set_mode_trajx_side( cx, msg_ctrl, PIR_LEFT );
+}
+
+int set_mode_trajx_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    return set_mode_trajx_side( cx, msg_ctrl, PIR_RIGHT );
 }
 
 static int collect_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double *q0, size_t n ) {

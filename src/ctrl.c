@@ -110,7 +110,6 @@ void ctrl_ws_left_finger( pirctrl_cx_t *cx ) {
     ctrl_ws( cx, PIR_AXIS_L0, cx->state.S_wp[PIR_LEFT], cx->state.S_eer[PIR_LEFT], PIR_LEFT );
 }
 
-
 void ctrl_ws_right_finger( pirctrl_cx_t *cx ) {
     ctrl_ws( cx, PIR_AXIS_R0, cx->state.S_wp[PIR_RIGHT], cx->state.S_eer[PIR_RIGHT], PIR_RIGHT );
 }
@@ -146,12 +145,11 @@ void ctrl_step( pirctrl_cx_t *cx ) {
 
 }
 
-void ctrl_trajx( pirctrl_cx_t *cx ) {
-    int side = PIR_LEFT;
+
+void ctrl_trajx_side( pirctrl_cx_t *cx, int side ) {
     int lwa, sdh;
     PIR_SIDE_INDICES( side, lwa, sdh );
     (void)sdh;
-
 
     double t = aa_tm_timespec2sec( aa_tm_sub( cx->now, cx->t0 ) );
 
@@ -175,15 +173,18 @@ void ctrl_trajx( pirctrl_cx_t *cx ) {
     double S_tmp[8];
     rfx_kin_duqu_relvel( cx->G[side].ref.S, cx->state.S_eer[side], dx, S_tmp, cx->G[side].ref.dx );
 
-
     int r = rfx_ctrl_ws_lin_vfwd( &cx->G[side], &cx->Kx, &cx->ref.dq[lwa] );
     if( RFX_OK != r ) {
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );
     }
-    //printf("trajx: "); aa_dump_vec(stdout, dx, 6 );
-    //printf("dq: "); aa_dump_vec(stdout, &cx->ref.dq[PIR_AXIS_L0], 8 );
+}
 
+void ctrl_trajx_left( pirctrl_cx_t *cx ) {
+    ctrl_trajx_side( cx, PIR_LEFT );
+}
+void ctrl_trajx_right( pirctrl_cx_t *cx ) {
+    ctrl_trajx_side( cx, PIR_RIGHT );
 }
 
 static void ctrl_trajq_doit( pirctrl_cx_t *cx, rfx_ctrl_t *G, rfx_ctrlq_lin_k_t *K, size_t off ) {
