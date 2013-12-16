@@ -29,7 +29,7 @@ testkin_SOURCES = src/testkin.c
 testkin_LDADD = -lsns  -lamino -lsocanmatic -lblas -llapack -lreflex libpiranha.la
 
 
-pirfilt_SOURCES = src/pirfilt.c
+pirfilt_SOURCES = src/pirfilt.c src/kinematics.cpp
 pirfilt_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex
 
 kinematics.f: $(top_srcdir)/src/kinematics.mac

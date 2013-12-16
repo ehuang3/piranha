@@ -90,33 +90,10 @@ static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts
 static void sighandler_hup ( int sig );
 static int bias_ft( void );
 
-static int kinematics( void );
 
-static const double R_0[9] = {0,1,0, 0,0,-1, -1,0,0};
-static const double v_0[3] = {0, LWA4_L_0 + PIR_L_SHOULDER_WIDTH/2 - LWA4_L_P,  0};
 
 int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
-
-    // Initial transforms
-    {
-        assert( aa_tf_isrotmat( R_0 ) );
-        double q0[4];
-        aa_tf_rotmat2quat( R_0, q0);
-        aa_tf_qv2duqu( q0, v_0, cx.S0[PIR_LEFT] );
-        double Srel[8] = {0};
-        aa_dump_vec( stdout, cx.S0[PIR_LEFT], 8 );
-        aa_tf_zangle2quat( M_PI, Srel );
-        aa_tf_duqu_mul( Srel, cx.S0[PIR_LEFT], cx.S0[PIR_RIGHT] );
-
-        /* double Tl[12], Tr[12]; */
-        /* aa_tf_duqu2tfmat( cx.S0[PIR_LEFT], Tl ); */
-        /* aa_tf_duqu2tfmat( cx.S0[PIR_RIGHT], Tr ); */
-        /* printf("left:\n"); */
-        /* aa_dump_mat( stdout, Tl, 3, 4 ); */
-        /* printf("right:\n"); */
-        /* aa_dump_mat( stdout, Tr, 3, 4 ); */
-    }
 
 
     /*-- args --*/
@@ -351,7 +328,8 @@ static void update(void) {
 
     if( is_updated ) {
         // compute kinematics
-        kinematics();
+        pir_kin_arm( &cx.state );
+        pir_kin_ft( &cx.state, cx.F_raw, cx.r_ft);
 
         // send
         ach_status_t r = ach_put( &cx.chan_state_pir, &cx.state,
@@ -363,44 +341,6 @@ static void update(void) {
     }
 }
 
-static int kinematics( void ) {
-    for( size_t i = 0; i < 2; i ++ ) {
-        int j, k;
-        PIR_SIDE_INDICES(i, j, k);
-        /*-- Arm --*/
-        lwa4_kin_duqu( &cx.state.q[j], cx.S0[i], aa_tf_duqu_ident,
-                       cx.state.S_wp[i], cx.state.J_wp[i]  );
-
-    /*-- Hand --*/
-        double y1, y2;
-        rfx_kin_2d2_fk( SDH_L1, SDH_L2,
-                        cx.state.q[k + PIR_SDH_L0],
-                        cx.state.q[k + PIR_SDH_L1],
-                        NULL,
-                        &y1 );
-        rfx_kin_2d2_fk( SDH_L1, SDH_L2,
-                        cx.state.q[k + PIR_SDH_R0],
-                        cx.state.q[k + PIR_SDH_R1],
-                        NULL,
-                        &y2 );
-        // add F/T, SDH, Fingers to S_ee
-        double s0[8], s1[8];
-        double x = LWA4_L_e + LWA4_FT_L + SDH_LB + (y1+y2)/2;
-        aa_tf_xxyz2duqu( -60 * M_PI/180, x, 0, 0, s0 );
-        aa_tf_xxyz2duqu( 0, 0, 0, -SDH_FC, s1 );
-        aa_tf_duqu_mul( s0, s1, cx.state.S_eer[i] );
-
-        /*-- F/T --*/
-        aa_tf_qmul( cx.state.S_wp[i], cx.r_ft_rel, cx.r_ft[i] );
-        // rotate
-        aa_tf_qrot( cx.r_ft[i], cx.F_raw[i],   cx.state.F[i]);
-        aa_tf_qrot( cx.r_ft[i], cx.F_raw[i]+3, cx.state.F[i]+3 );
-        // subtract end-effector mass
-        cx.state.F[i][2] = cx.state.F[i][2] - PIR_FT_WEIGHT - SDH_WEIGHT;
-    }
-
-    return 0;
-}
 
 static int bias_ft( void ) {
 

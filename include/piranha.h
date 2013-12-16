@@ -46,6 +46,10 @@
 #include <amino.h>
 #include <reflex.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define PIR_MAX_MSG_AXES 7
 
 #define PIR_FT_WEIGHT 4
@@ -166,6 +170,8 @@ void lwa4_duqu( const double *q, double *S_rel );
 
 int pir_kin_solve( double q0[7], double S1[8], double q1[7] );
 
+int pir_kin_arm( struct pir_state *X );
+int pir_kin_ft( struct pir_state *X, double F_raw[2][6], double r_ft[2][4] );
 
 struct pir_msg {
     char mode[64];
@@ -287,5 +293,9 @@ int sdh_pinch_left( pirctrl_cx_t *cx, struct pir_msg * );
 int sdh_pinch_right( pirctrl_cx_t *cx, struct pir_msg * );
 int sdh_set_left( pirctrl_cx_t *cx, struct pir_msg * );
 int sdh_set_right( pirctrl_cx_t *cx, struct pir_msg * );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //PIRANHA_H
