@@ -65,11 +65,13 @@
 #define LWA4_FT_ANGLE (45*M_PI/180)
 
 
-#define LWA4_L_0 (0.3000) /* pedestal to shoulder */
+#define LWA4_L_P (0.05)   /* pedestal height */
+#define LWA4_L_0 (0.3000) /* pedestal base to shoulder */
 #define LWA4_L_1 (0.6280 - LWA4_L_0) /* shoulder to elbow */
 #define LWA4_L_2 (0.9510 - LWA4_L_1 - LWA4_L_0) /* elbow to wrist */
 #define LWA4_L_e (1.0334 - LWA4_L_2 - LWA4_L_1 - LWA4_L_0) /* wrist to E.E end of powerball */
 
+#define PIR_L_SHOULDER_WIDTH (6.35e-2) /* width of shoulder mount middle section */
 
 // TODO: Adjust for new tool changer
 

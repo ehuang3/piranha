@@ -92,19 +92,30 @@ static int bias_ft( void );
 
 static int kinematics( void );
 
-static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
-static const double tf_0[] = {0,1,0, 0,0,-1, -1,0,0, 0,0,0};
+static const double R_0[9] = {0,1,0, 0,0,-1, -1,0,0};
+static const double v_0[3] = {0, LWA4_L_0 + PIR_L_SHOULDER_WIDTH/2 - LWA4_L_P,  0};
 
 int main( int argc, char **argv ) {
     memset(&cx, 0, sizeof(cx));
 
-    assert( aa_tf_isrotmat( tf_0 ) );
-
+    // Initial transforms
     {
-        aa_tf_tfmat2duqu( tf_0, cx.S0[PIR_LEFT] );
+        assert( aa_tf_isrotmat( R_0 ) );
+        double q0[4];
+        aa_tf_rotmat2quat( R_0, q0);
+        aa_tf_qv2duqu( q0, v_0, cx.S0[PIR_LEFT] );
         double Srel[8] = {0};
+        aa_dump_vec( stdout, cx.S0[PIR_LEFT], 8 );
         aa_tf_zangle2quat( M_PI, Srel );
         aa_tf_duqu_mul( Srel, cx.S0[PIR_LEFT], cx.S0[PIR_RIGHT] );
+
+        /* double Tl[12], Tr[12]; */
+        /* aa_tf_duqu2tfmat( cx.S0[PIR_LEFT], Tl ); */
+        /* aa_tf_duqu2tfmat( cx.S0[PIR_RIGHT], Tr ); */
+        /* printf("left:\n"); */
+        /* aa_dump_mat( stdout, Tl, 3, 4 ); */
+        /* printf("right:\n"); */
+        /* aa_dump_mat( stdout, Tr, 3, 4 ); */
     }
 
 
