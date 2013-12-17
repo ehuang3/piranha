@@ -38,6 +38,5 @@
 ;;;;   POSSIBILITY OF SUCH DAMAGE.
 
 (defpackage :piranha
-  (:use :cl :cffi :alexandria)
+  (:use :cl :cffi :alexandria :amino)
   (:nicknames :pir))
-

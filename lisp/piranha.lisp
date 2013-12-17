@@ -57,6 +57,8 @@
 (defconstant pi/2 (* .5 pi))
 (defconstant -pi/2 (* -.5 pi))
 
+(defparameter +r-down+ (quaternion (y-angle pi/2)))
+
 (defun pir-start ()
   (assert (null *ctrl-channel*))
   (setq *ctrl-channel* (ach::open-channel "pir-ctrl"))
@@ -117,12 +119,12 @@
   ;; x-l       ; left translation vector
   ;; x-r       ; right translation vector
 
-  (e-l (aa::make-quaternion-translation) :type aa::quaternion-translation)
-  (e-r (aa::make-quaternion-translation) :type aa::quaternion-translation)
-  (e-eer-l (aa::make-quaternion-translation) :type aa::quaternion-translation)
-  (e-eer-r (aa::make-quaternion-translation) :type aa::quaternion-translation)
-  (e-f-l (aa::make-quaternion-translation) :type aa::quaternion-translation)
-  (e-f-r (aa::make-quaternion-translation) :type aa::quaternion-translation)
+  (e-l (quaternion-translation nil) :type aa::quaternion-translation)
+  (e-r (quaternion-translation nil) :type aa::quaternion-translation)
+  (e-eer-l (quaternion-translation nil) :type aa::quaternion-translation)
+  (e-eer-r (quaternion-translation nil) :type aa::quaternion-translation)
+  (e-f-l (quaternion-translation nil) :type aa::quaternion-translation)
+  (e-f-r (quaternion-translation nil) :type aa::quaternion-translation)
 
   f-l
   f-r
@@ -143,7 +145,7 @@
     (labels ((extract (x n)
                (read-doubles (foreign-slot-pointer state '(:struct pir-cstate) x) n))
              (extract-qutr (x)
-               (aa::tf-duqu2qutr (aa::make-dual-quaternion :data (extract x 8)))))
+               (quaternion-translation (dual-quaternion (extract x 8)))))
       (let ((e-l (extract-qutr 's-l))
             (e-r (extract-qutr 's-r))
             (e-eer-l (extract-qutr 's-eer-l))
@@ -164,8 +166,8 @@
                    :e-r e-r
                    :e-eer-l e-eer-l
                    :e-eer-r e-eer-r
-                   :e-f-l (aa::tf-qutr-mul e-l e-eer-l)
-                   :e-f-r (aa::tf-qutr-mul e-r e-eer-r)
+                   :e-f-l (g* e-l e-eer-l)
+                   :e-f-r (g* e-r e-eer-r)
 
                    ;; :s-l s-l
                    ;; :s-r s-r
@@ -241,6 +243,10 @@
   pose
   time)
 
+(defun trajx-point (pose time)
+  (make-trajx-point :pose (dual-quaternion pose)
+                    :time time))
+
 (defun trajx-point-data (points)
   (let* ((n (length points))
          (data (amino::make-vec (* 9 n))))
@@ -255,16 +261,13 @@
 
 (defun pir-go (side points &key
                (state (get-state)))
-  (setq *last-traj* (append (list (make-trajx-point :pose (aa::tf-qutr2duqu (pir-state-e-l state))
-                                                    :time 0d0))
+  (setq *last-traj* (append (list (trajx-point (pir-state-e-l state)
+                                               0d0))
                             points))
   (pir-message (side-case side "trajx") (trajx-point-data points)))
 
 (defun pir-go-1 (side s &optional (time 10d0))
-  (let ((state (get-state)))
-    (pir-go side (list (make-trajx-point :pose s
-                                         :time time))
-            :state state)))
+  (pir-go side (list (trajx-point s time))))
 
 
 (defun pir-go-rel (side &key
@@ -275,10 +278,12 @@
                    (time 5d0)
                    (r amino::+tf-quat-ident+))
   (let ((state (get-state)))
-    (let* ((e-rel (aa::make-quaternion-translation :quaternion r :translation xyz))
-           (e-1 (amino::tf-qutr-mul (pir-state-e-f-l state) e-rel)))
-      (pir-go side (list (make-trajx-point :pose (aa::tf-qutr2duqu e-1)
-                                           :time time))
+    (let* ((e-rel (quaternion-translation-2 r xyz))
+           (e-0 (ecase side
+                  (:left (pir-state-e-f-l state))
+                  (:right (pir-state-e-f-r state)))))
+      (pir-go side (list (trajx-point (g* e-0 e-rel)
+                                      time))
               :state state))))
 
 (defun pir-screw (side x theta &key (time 5d0))
@@ -299,7 +304,8 @@
 
 (defun pir-zrotate (side theta &key (time 10d0))
   (pir-rotate side
-              (aa::tf-qmul (aa::tf-yangle2quat (/ pi 2)) (aa::tf-xangle2quat theta)) :time time))
+              (aa::g* +r-down+ (x-angle theta))
+              :time time))
 
 (defstruct trajq-point
   q
@@ -367,24 +373,24 @@
 (defparameter *q-store-l* (aa::vec (* 0.5 pi) (* -0.5 pi) 0 0 0 0 0))
 (defparameter *q-up-l* (aa::vec (* 0.5 pi) (* -0.2 pi) 0 (* -0.2 pi) 0 (* .55 pi) 0))
 (defparameter *q-over-l* (aa::vec (* 0.1 pi) (* -0.2 pi) 0 (* -0.2 pi) 0 (* .55 pi) 0))
-(defparameter *q-go-l* (aa::vec 0.7095810606908146d0 -0.9248150640467554d0 -0.8247204314448805d0
-                                -1.4530564154553591d0 -0.9698096521631692d0 1.3412331702800824d0
-                                0.5472479869628221d0))
+(defparameter *q-go-l* (aa::vec 0.6127501937901693d0 -1.063760725798024d0 -0.7395658172400772d0
+                                -1.2926781104896001d0 -0.940331041096985d0 1.3763666481227284d0
+                                0.5270894341022875d0))
+(defparameter *q-go-r* (aa::vec -0.5366189318181765d0 0.9482722891935591d0 0.5890311692555663d0
+                                 1.286272752134781d0 1.0863976461963905d0 -1.4665827171583152d0
+                                 -1.585422185926609d0))
 
 (defun pir-mirror-l->r (q)
-  (let ((v (aa::g* -1d0 q)))
-    (incf (aref v 6)
-          (* -1 (/ 60d0 180) pi)) ;; TODO: check this value
-    v))
+  (aa::g* -1d0 q))
+
+(defun pir-mirror-cat (q)
+  (aa::veccat q (aa::g* -1d0 q)))
 
 (defun pir-trajq-side-point (side point)
   (ecase side
     (:left point)
     (:right (make-trajq-point :q (aa::g* -1d0 (trajq-point-q point))
-                              :time (trajq-point-time point)))
-    (:lr (make-trajq-point :q (aa::veccat (trajq-point-q point)
-                                          (pir-mirror-l->r (trajq-point-q point)))
-                           :time (trajq-point-time point)))))
+                              :time (trajq-point-time point)))))
 
 
 (defun pir-trajq-side (side traj)
@@ -417,6 +423,26 @@
   (pir-trajq-side side (list (make-trajq-point :q *q-up-l* :time 8d0)
                              (make-trajq-point :q *q-over-l* :time 10d0)
                              (make-trajq-point :q *q-go-l* :time 5d0))))
+
+(defun pir-table ()
+  (pir-trajq :lr (list (make-trajq-point :q (pir-mirror-cat *q-up-l*)
+                                         :time 8d0)
+                       (make-trajq-point :q (pir-mirror-cat *q-over-l*)
+                                         :time 10d0)
+                       (make-trajq-point :q (aa::veccat *q-go-l* *q-go-r*)
+                                         :time 5d0))))
+
+
+(defun pir-store ()
+  ;; TODO: check if near go position already
+  (pir-trajq :lr (list (make-trajq-point :q (aa::veccat *q-go-l* *q-go-r*)
+                                         :time 8d0)
+                       (make-trajq-point :q (pir-mirror-cat *q-over-l*)
+                                         :time 8d0)
+                       (make-trajq-point :q (pir-mirror-cat *q-up-l*)
+                                         :time 7d0)
+                       (make-trajq-point :q (pir-mirror-cat *q-store-l*)
+                                         :time 5d0))))
 
 
 (defun pir-pinch (side y r)
