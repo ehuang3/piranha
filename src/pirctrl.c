@@ -284,11 +284,11 @@ int main( int argc, char **argv ) {
     // joint
     cx.Kq.n_q = 7;
     cx.Kq.p = AA_NEW_AR( double, 7 );
-    AA_MEM_SET( cx.Kq.p, 0, 7 );
+    AA_MEM_SET( cx.Kq.p, .5, 7 );
 
     cx.Kq_lr.n_q = 14;
     cx.Kq_lr.p = AA_NEW_AR( double, 14 );
-    AA_MEM_SET( cx.Kq_lr.p, 0, 14 );
+    AA_MEM_SET( cx.Kq_lr.p, .5, 14 );
 
     cx.Kq_T.n_q = 1;
     cx.Kq_T.p = AA_NEW_AR( double, 1 );
