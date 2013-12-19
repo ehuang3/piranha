@@ -146,7 +146,7 @@ int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     return 0;
 }
 
-int set_mode_trajx_side(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, int side ) {
+int set_mode_trajx_side(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double S0[8] ) {
     if( msg_ctrl->n < 9 ) return -1;
     zero_refs(cx);
 
@@ -157,11 +157,7 @@ int set_mode_trajx_side(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, int side ) {
     struct rfx_trajx_point_list *plist = rfx_trajx_point_list_alloc( &cx->modereg );
 
     // initial point
-    {
-        double S0[8];
-        aa_tf_duqu_mul( cx->state.S_wp[side], cx->state.S_eer[side], S0 );
-        rfx_trajx_point_list_addb_duqu( plist, 0, 1, S0 );
-    }
+    rfx_trajx_point_list_addb_duqu( plist, 0, 1, S0 );
 
     // final point
     for( size_t i = 0; i + 9 <= msg_ctrl->n; i += 9 ) {
@@ -180,11 +176,23 @@ int set_mode_trajx_side(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, int side ) {
 
 
 int set_mode_trajx_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    return set_mode_trajx_side( cx, msg_ctrl, PIR_LEFT );
+    double S0[8];
+    aa_tf_duqu_mul( cx->state.S_wp[PIR_LEFT], cx->state.S_eer[PIR_LEFT], S0 );
+    return set_mode_trajx_side( cx, msg_ctrl, S0 );
 }
 
 int set_mode_trajx_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    return set_mode_trajx_side( cx, msg_ctrl, PIR_RIGHT );
+    double S0[8];
+    aa_tf_duqu_mul( cx->state.S_wp[PIR_RIGHT], cx->state.S_eer[PIR_RIGHT], S0 );
+    return set_mode_trajx_side( cx, msg_ctrl, S0 );
+}
+
+int set_mode_trajx_w_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    return set_mode_trajx_side( cx, msg_ctrl, cx->state.S_wp[PIR_LEFT] );
+}
+
+int set_mode_trajx_w_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    return set_mode_trajx_side( cx, msg_ctrl, cx->state.S_wp[PIR_RIGHT]);
 }
 
 static int collect_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double *q0, size_t n ) {

@@ -60,21 +60,29 @@ static void kin_init(void) {
 
     // Arm
     {
-        amino::RotMat R0(0,0,-1,
-                         1,0,0,
-                         0,-1,0);
-        assert( aa_tf_isrotmat( R0.data ) );
+        amino::RotMat R0l(0, 0, -1,
+                         1, 0,  0,
+                         0,-1,  0);
+        assert( aa_tf_isrotmat( R0l.data ) );
+        double x = LWA4_L_0 + PIR_L_SHOULDER_WIDTH/2 - LWA4_L_P;
 
-        S0[PIR_LEFT] = amino::DualQuat( amino::Quat(R0),
-                                        amino::Vec3(0, LWA4_L_0 + PIR_L_SHOULDER_WIDTH/2 - LWA4_L_P,  0) );
+        S0[PIR_LEFT] = amino::DualQuat( amino::Quat(R0l),
+                                        amino::Vec3(0, x,  0) );
+        amino::RotMat R0r(0, 0, 1,
+                         -1, 0,  0,
+                          0, -1,  0);
+        assert( aa_tf_isrotmat( R0r.data ) );
+        S0[PIR_RIGHT] = amino::DualQuat( amino::Quat(R0r),
+                                        amino::Vec3(0, -x,  0) );
 
-        amino::DualQuat Srel( amino::Quat(amino::AxisAngle( 0,0,1, M_PI )),
-                              amino::Vec3(0,0,0) );
 
-        S0[PIR_RIGHT] = Srel * S0[PIR_LEFT];
-        amino::AxisAngle A0(S0[PIR_LEFT].real);
-        printf("arm: ");
-        aa_dump_vec( stdout, A0.data, 4 );
+        /* amino::DualQuat Srel( amino::Quat(amino::AxisAngle( 1,0,0, M_PI )), */
+        /*                       amino::Vec3(0,0,0) ); */
+
+        /* S0[PIR_RIGHT] = Srel * S0[PIR_LEFT]; */
+        /* amino::AxisAngle A0(S0[PIR_LEFT].real); */
+        /* printf("arm: "); */
+        /* aa_dump_vec( stdout, A0.data, 4 ); */
     }
 
     // F/T rotation
@@ -89,17 +97,47 @@ static void kin_init(void) {
         r_ft_rel = amino::Quat(R0) * amino::Quat(R_rel);
     }
 
+
+    double xl[3], xr[3];
+    aa_tf_duqu_trans( S0[PIR_LEFT].data, xl );
+    aa_tf_duqu_trans( S0[PIR_RIGHT].data, xr );
+    printf("S0 left:  " ); aa_dump_vec( stdout, xl, 3 );
+    printf("S0 right: " ); aa_dump_vec( stdout, xr, 3 );
+
     is_init = 1;
 }
+
+
+/* void sdh_duqu( const double q[7], double Srel[10] ) */
+/* { */
+/*     Srel[PIR_SDH_AXIAL] = */
+/* } */
 
 int pir_kin_arm( struct pir_state *X ) {
 
     if( !is_init) kin_init();
 
+    /* double qq[2][7] = { {-M_PI_2,M_PI_2,0,0,0,0,0}, */
+    /*                     {M_PI_2,-M_PI_2,0,0,0,0,0} }; */
+
+    /* for( size_t i = 0; i < 2; i ++ ) { */
+    /*     int j, k; */
+    /*     PIR_SIDE_INDICES(i, j, k); */
+    /*     lwa4_kin_duqu( &X->q[j], S0[i].data, aa_tf_duqu_ident, */
+    /*                    X->S_wp[i], X->J_wp[i]  ); */
+    /* } */
+    /* double xl[3], xr[3]; */
+    /* aa_tf_duqu_trans( X->S_wp[PIR_LEFT], xl ); */
+    /* aa_tf_duqu_trans( X->S_wp[PIR_RIGHT], xr ); */
+    /* printf("left:  " ); aa_dump_vec( stdout, xl, 3 ); */
+    /* printf("right: " ); aa_dump_vec( stdout, xr, 3 ); */
+
+
     for( size_t i = 0; i < 2; i ++ ) {
         int j, k;
         PIR_SIDE_INDICES(i, j, k);
         /*-- Arm --*/
+        //printf("%d: ", i ); aa_dump_vec( stdout, &X->q[j], 7 );
         lwa4_kin_duqu( &X->q[j], S0[i].data, aa_tf_duqu_ident,
                        X->S_wp[i], X->J_wp[i]  );
         /*-- Hand --*/
@@ -115,12 +153,19 @@ int pir_kin_arm( struct pir_state *X ) {
                         NULL,
                         &y2 );
         // add F/T, SDH, Fingers to S_ee
+        double s0[8], s1[8];
         double x = LWA4_L_e + LWA4_FT_L + SDH_LB + (y1+y2)/2;
-        aa_tf_xxyz2duqu( -60 * M_PI/180,
-                         x, 0, -SDH_FC,
-                         X->S_eer[i] );
+        aa_tf_xxyz2duqu( -60 * M_PI/180, x, 0, 0, s0 );
+        aa_tf_xxyz2duqu( 0, 0, 0, -SDH_FC, s1 );
+        aa_tf_duqu_mul( s0, s1, X->S_eer[i] );
+
+        /* double x = LWA4_L_e + LWA4_FT_L + SDH_LB + (y1+y2)/2; */
+        /* aa_tf_xxyz2duqu( -60 * M_PI/180, */
+        /*                  x, 0, 0, */
+        /*                  X->S_eer[i] ); */
 
     }
+
 
     return 0;
 }

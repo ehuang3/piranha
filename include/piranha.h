@@ -62,20 +62,27 @@ extern "C" {
 #define PIR_SDH_R0    5
 #define PIR_SDH_R1    6
 
+#define PIR_SDH_L2    7
+#define PIR_SDH_T2    8
+#define PIR_SDH_R2    9
+
+
 
 // TODO: subtract inseration depth of tool changer
-#define LWA4_FT_L 82.2e-3 ///< Length of F/T Sensor
-
+#define LWA4_FT_L_fudge -1.5e-2 /* measured on physical arm */
+#define LWA4_FT_L (82.2e-3 + LWA4_FT_L_fudge) ///< Length of F/T Sensor
 #define LWA4_FT_ANGLE (45*M_PI/180)
 
 
-#define LWA4_L_P (0.05)   /* pedestal height */
+#define LWA4_L_P_fudge (-.5e-2)   /* offset, measured with arm */
+#define LWA4_L_P (0.05 + LWA4_L_P_fudge)   /* pedestal height, measured */
 #define LWA4_L_0 (0.3000) /* pedestal base to shoulder */
 #define LWA4_L_1 (0.6280 - LWA4_L_0) /* shoulder to elbow */
 #define LWA4_L_2 (0.9510 - LWA4_L_1 - LWA4_L_0) /* elbow to wrist */
 #define LWA4_L_e (1.0334 - LWA4_L_2 - LWA4_L_1 - LWA4_L_0) /* wrist to E.E end of powerball */
 
 #define PIR_L_SHOULDER_WIDTH (6.35e-2) /* width of shoulder mount middle section */
+
 
 // TODO: Adjust for new tool changer
 
@@ -262,6 +269,8 @@ int set_mode_ws_right_finger(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajx_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajx_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_trajx_w_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+int set_mode_trajx_w_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_trajq_lr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
@@ -283,6 +292,8 @@ void ctrl_sin( pirctrl_cx_t *cx );
 void ctrl_step( pirctrl_cx_t *cx );
 void ctrl_trajx_left( pirctrl_cx_t *cx );
 void ctrl_trajx_right( pirctrl_cx_t *cx );
+void ctrl_trajx_w_left( pirctrl_cx_t *cx );
+void ctrl_trajx_w_right( pirctrl_cx_t *cx );
 void ctrl_trajq_left( pirctrl_cx_t *cx );
 void ctrl_trajq_right( pirctrl_cx_t *cx );
 void ctrl_trajq_lr( pirctrl_cx_t *cx );

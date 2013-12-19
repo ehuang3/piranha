@@ -53,11 +53,20 @@
 (defvar *last-traj*)
 
 (defvar *state*)
+(defvar *statex*)
 
 (defconstant pi/2 (* .5 pi))
 (defconstant -pi/2 (* -.5 pi))
 
+(defun pi* (x) (* x pi))
+
+(defun degrees (x) (/ (* x pi) 180d0))
+
 (defparameter +r-down+ (quaternion (y-angle pi/2)))
+(defparameter +r-left+ (g* (quaternion (z-angle pi/2))
+                           (x-angle pi/2)))
+(defparameter +r-right+ (g* (quaternion (z-angle -pi/2))
+                            (x-angle -pi/2)))
 
 (defun pir-start ()
   (assert (null *ctrl-channel*))
@@ -183,6 +192,18 @@
 
                    ))))))
 
+(defun print-state (&optional (state (get-state)))
+  (labels ((print-e (name e)
+             (let ((list (matrix->list e)))
+               (format t "~&~A-orientation: ~{~,3F~^ ~}~&" name (car list))
+               (format t "~&~A-translation: ~{~,3F~^ ~}~&" name (cadr list)))))
+    (print-e "left" (pir-state-e-l state))
+    (print-e "right" (pir-state-e-r state))
+    (print-e "left-finger" (pir-state-e-f-l state))
+    (print-e "right-finger" (pir-state-e-f-r state)))
+  )
+
+
 (defun pir-set-mode (msg mode)
   (assert (< (length mode) 63))
   (labels ((setit (i val)
@@ -260,14 +281,19 @@
     data))
 
 (defun pir-go (side points &key
+               (point :finger)
                (state (get-state)))
-  (setq *last-traj* (append (list (trajx-point (pir-state-e-l state)
-                                               0d0))
-                            points))
-  (pir-message (side-case side "trajx") (trajx-point-data points)))
+  (let ((thing (ecase point
+                 (:finger "trajx")
+                 (:wrist "trajx-w"))))
+    (setq *last-traj* (append (list (trajx-point (pir-state-e-l state)
+                                                 0d0))
+                              points))
+    (pir-message (side-case side thing) (trajx-point-data points))))
 
-(defun pir-go-1 (side s &optional (time 10d0))
-  (pir-go side (list (trajx-point s time))))
+(defun pir-go-1 (side s &key (point :finger) (time 10d0))
+  (pir-go side (list (trajx-point s time))
+          :point point))
 
 
 (defun pir-go-rel (side &key
@@ -340,10 +366,13 @@
                (trajq-point-data points)))
 
 
-(defun pir-set (side q &key (time 10d0))
+(defun pir-set-side (side q &key (time 10d0))
   (check-type q (simple-array double-float (7)))
-  (pir-trajq side (list (make-trajq-point :q q :time time))))
+  (pir-trajq-side side (list (make-trajq-point :q q :time time))))
 
+(defun pir-set (side q &key (time 10d0))
+  ;(check-type q (simple-array double-float (7)))
+  (pir-trajq side (list (make-trajq-point :q q :time time))))
 
 (defun pir-torso (q &key (time 10d0))
   (pir-message "trajq-torso" (aa::vec time q)))
@@ -389,7 +418,9 @@
 (defun pir-trajq-side-point (side point)
   (ecase side
     (:left point)
-    (:right (make-trajq-point :q (aa::g* -1d0 (trajq-point-q point))
+    (:right (make-trajq-point :q (pir-mirror-l->r (trajq-point-q point))
+                              :time (trajq-point-time point)))
+    (:lr (make-trajq-point :q (pir-mirror-cat (trajq-point-q point))
                               :time (trajq-point-time point)))))
 
 

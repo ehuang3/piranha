@@ -146,7 +146,7 @@ void ctrl_step( pirctrl_cx_t *cx ) {
 }
 
 
-void ctrl_trajx_side( pirctrl_cx_t *cx, int side ) {
+void ctrl_trajx_side( pirctrl_cx_t *cx, int side, int eer ) {
     int lwa, sdh;
     PIR_SIDE_INDICES( side, lwa, sdh );
     (void)sdh;
@@ -162,10 +162,15 @@ void ctrl_trajx_side( pirctrl_cx_t *cx, int side ) {
     double S_traj[8], dx[6] = {0};
     rfx_trajx_seg_list_get_dx_duqu( cx->trajx_segs, t, S_traj, dx );
 
-    // convert to wrist frame
-    aa_tf_duqu_mulc( S_traj, cx->state.S_eer[side], cx->G[side].ref.S  );
-    double S_tmp[8];
-    rfx_kin_duqu_relvel( cx->G[side].ref.S, cx->state.S_eer[side], dx, S_tmp, cx->G[side].ref.dx );
+    if( eer ) {
+        // convert to wrist frame
+        aa_tf_duqu_mulc( S_traj, cx->state.S_eer[side], cx->G[side].ref.S  );
+        double S_tmp[8];
+        rfx_kin_duqu_relvel( cx->G[side].ref.S, cx->state.S_eer[side], dx, S_tmp, cx->G[side].ref.dx );
+    } else {
+        memcpy( cx->G[side].ref.S, S_traj, sizeof(S_traj) );
+        memcpy( cx->G[side].ref.dx, dx, sizeof(dx) );
+    }
 
     int r = rfx_ctrl_ws_lin_vfwd( &cx->G[side], &cx->Kx, &cx->ref.dq[lwa] );
     if( RFX_OK != r ) {
@@ -174,11 +179,17 @@ void ctrl_trajx_side( pirctrl_cx_t *cx, int side ) {
     }
 }
 
+void ctrl_trajx_w_left( pirctrl_cx_t *cx ) {
+    ctrl_trajx_side( cx, PIR_LEFT, 0 );
+}
+void ctrl_trajx_w_right( pirctrl_cx_t *cx ) {
+    ctrl_trajx_side( cx, PIR_RIGHT, 0 );
+}
 void ctrl_trajx_left( pirctrl_cx_t *cx ) {
-    ctrl_trajx_side( cx, PIR_LEFT );
+    ctrl_trajx_side( cx, PIR_LEFT, 1 );
 }
 void ctrl_trajx_right( pirctrl_cx_t *cx ) {
-    ctrl_trajx_side( cx, PIR_RIGHT );
+    ctrl_trajx_side( cx, PIR_RIGHT, 1 );
 }
 
 static void ctrl_trajq_doit( pirctrl_cx_t *cx, rfx_ctrl_t *G, rfx_ctrlq_lin_k_t *K, size_t off ) {
