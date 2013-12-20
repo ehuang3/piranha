@@ -167,59 +167,88 @@ void lwa4_kin_duqu( const double *q, const double S0[8], const double See[8], do
 }
 
 
+void printx( const char *n, const double S[8] ) {
+    double x[3];
+    aa_tf_duqu_trans( S, x );
+    printf("%s: [%.3f, %.3f, %.3f, %.3f] | [%.3f, %.3f, %.3f]\n", n,
+           S[0], S[1], S[2], S[3],
+           x[0], x[1], x[2]
+        );
+}
+
+void sdh_finger_duqu( const double q0, double q1, double z, double S0[8], double S1[8], double S2[8] ) {
+    new (S0)      DualQuat( YAngle(q0),
+                            Vec3(0, 0, z) );
+    new (S1)      DualQuat( YAngle(q1),
+                            Vec3( SDH_L1,0,0) );
+    new (S2)      DualQuat( Vec3( SDH_L2,0,0) );
+}
+
+void sdh_duqu( const double q[7], double Sr[8*12] )
+{
+    /* Fill in Sr with the relative dual quaternions */
+    new (Sr+8*PIR_SDH_CENTER)  DualQuat( Vec3(SDH_LB, 0, 0) ); // At knuckle level
+    new (Sr+8*PIR_SDH_L_AXIAL) DualQuat( XAngle(-q[PIR_SDH_AXIAL]+M_PI),
+                                         Vec3(0, -SDH_B/2, -SDH_FC) );
+    new (Sr+8*PIR_SDH_R_AXIAL) DualQuat( XAngle(q[PIR_SDH_AXIAL]+M_PI),
+                                         Vec3(0, SDH_B/2, -SDH_FC) );
+
+    sdh_finger_duqu( q[PIR_SDH_T0], q[PIR_SDH_T1], SDH_TC,
+                     Sr+8*PIR_SDH_T0, Sr+8*PIR_SDH_T1, Sr+8*PIR_SDH_T2 );
+    sdh_finger_duqu( q[PIR_SDH_L0], q[PIR_SDH_L1], 0,
+                     Sr+8*PIR_SDH_L0, Sr+8*PIR_SDH_L1, Sr+8*PIR_SDH_L2 );
+    sdh_finger_duqu( q[PIR_SDH_R0], q[PIR_SDH_R1], 0,
+                     Sr+8*PIR_SDH_R0, Sr+8*PIR_SDH_R1, Sr+8*PIR_SDH_R2 );
+}
+
+void sdh_fk_duqu( const double q[7], DualQuat &S0,
+                  DualQuat *St, DualQuat *Sl, DualQuat *Sr )
+{
+    double S_re[8*12] = {0};
+        sdh_duqu( q, S_re );
+
+        DualQuat Sc = S0*DualQuat(&S_re[8*PIR_SDH_CENTER]);
+        *Sl = (Sc *
+               DualQuat(&S_re[8*PIR_SDH_L_AXIAL]) *
+               DualQuat(&S_re[8*PIR_SDH_L0]) *
+               DualQuat(&S_re[8*PIR_SDH_L1]) *
+               DualQuat(&S_re[8*PIR_SDH_L2]));
+
+        *Sr = (Sc *
+               DualQuat(&S_re[8*PIR_SDH_R_AXIAL]) *
+               DualQuat(&S_re[8*PIR_SDH_R0]) *
+               DualQuat(&S_re[8*PIR_SDH_R1]) *
+               DualQuat(&S_re[8*PIR_SDH_R2]));
+
+        *St = (Sc *
+               DualQuat(&S_re[8*PIR_SDH_T0]) *
+               DualQuat(&S_re[8*PIR_SDH_T1]) *
+               DualQuat(&S_re[8*PIR_SDH_T2]));
+}
+
 int pir_kin_arm( struct pir_state *X ) {
 
     if( !is_init) kin_init();
-
-    /* double qq[2][7] = { {-M_PI_2,M_PI_2,0,0,0,0,0}, */
-    /*                     {M_PI_2,-M_PI_2,0,0,0,0,0} }; */
-
-    /* for( size_t i = 0; i < 2; i ++ ) { */
-    /*     int j, k; */
-    /*     PIR_SIDE_INDICES(i, j, k); */
-    /*     lwa4_kin_duqu( &X->q[j], S0[i].data, aa_tf_duqu_ident, */
-    /*                    X->S_wp[i], X->J_wp[i]  ); */
-    /* } */
-    /* double xl[3], xr[3]; */
-    /* aa_tf_duqu_trans( X->S_wp[PIR_LEFT], xl ); */
-    /* aa_tf_duqu_trans( X->S_wp[PIR_RIGHT], xr ); */
-    /* printf("left:  " ); aa_dump_vec( stdout, xl, 3 ); */
-    /* printf("right: " ); aa_dump_vec( stdout, xr, 3 ); */
-
 
     for( size_t i = 0; i < 2; i ++ ) {
         int j, k;
         PIR_SIDE_INDICES(i, j, k);
         /*-- Arm --*/
-        //printf("%d: ", i ); aa_dump_vec( stdout, &X->q[j], 7 );
         lwa4_kin_duqu( &X->q[j], S0[i].data, aa_tf_duqu_ident,
-                       X->S_wp[i], X->J_wp[i]  );
+                       X->S_wp[i], X->J_wp[i] );
         /*-- Hand --*/
-        double y1, y2;
-        rfx_kin_2d2_fk( SDH_L1, SDH_L2,
-                        X->q[k + PIR_SDH_L0],
-                        X->q[k + PIR_SDH_L1],
-                        NULL,
-                        &y1 );
-        rfx_kin_2d2_fk( SDH_L1, SDH_L2,
-                        X->q[k + PIR_SDH_R0],
-                        X->q[k + PIR_SDH_R1],
-                        NULL,
-                        &y2 );
-        // add F/T, SDH, Fingers to S_ee
-        double s0[8], s1[8];
-        double x = LWA4_L_e + LWA4_FT_L + SDH_LB + (y1+y2)/2;
-        aa_tf_xxyz2duqu( -60 * M_PI/180, x, 0, 0, s0 );
-        aa_tf_xxyz2duqu( 0, 0, 0, -SDH_FC, s1 );
-        aa_tf_duqu_mul( s0, s1, X->S_eer[i] );
+        // fixed TF to hand base
+        DualQuat S_w2e(XAngle(-60*M_PI/180),
+                       Vec3(LWA4_L_e + LWA4_FT_L, 0, 0));
+        DualQuat S_l2, S_r2, S_t2;
+        sdh_fk_duqu( &X->q[k], S_w2e,
+                     &S_t2, &S_l2, &S_r2 );
+        /* Find pose of point between the two fingers */
+        new( &X->S_eer[i] ) DualQuat( S_w2e.real,
+                                      (S_r2.translation() + S_l2.translation()) / 2 );
 
-        /* double x = LWA4_L_e + LWA4_FT_L + SDH_LB + (y1+y2)/2; */
-        /* aa_tf_xxyz2duqu( -60 * M_PI/180, */
-        /*                  x, 0, 0, */
-        /*                  X->S_eer[i] ); */
 
     }
-
 
     return 0;
 }

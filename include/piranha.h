@@ -55,16 +55,23 @@ extern "C" {
 #define PIR_FT_WEIGHT 4
 
 #define PIR_SDH_AXIAL 0
+// F1
 #define PIR_SDH_L0    1
 #define PIR_SDH_L1    2
+// F2
 #define PIR_SDH_T0    3
 #define PIR_SDH_T1    4
+// F3
 #define PIR_SDH_R0    5
 #define PIR_SDH_R1    6
 
-#define PIR_SDH_L2    7
-#define PIR_SDH_T2    8
-#define PIR_SDH_R2    9
+#define PIR_SDH_CENTER  0
+#define PIR_SDH_L_AXIAL 7
+#define PIR_SDH_R_AXIAL 8
+
+#define PIR_SDH_L2    9
+#define PIR_SDH_T2    10
+#define PIR_SDH_R2    11
 
 
 
