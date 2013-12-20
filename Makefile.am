@@ -15,7 +15,8 @@ lib_LTLIBRARIES = libpiranha.la
 
 libpiranha_la_SOURCES =                  \
 	tf.f                             \
-	src/lwa4.c
+	src/lwa4.c                       \
+	src/kinematics.cpp
 
 # check_can_SOURCES = src/check-can.c
 # check_can_LDADD = -lsns  -lamino -lsocanmatic -lblas -llapack
@@ -29,8 +30,8 @@ testkin_SOURCES = src/testkin.c
 testkin_LDADD = -lsns  -lamino -lsocanmatic -lblas -llapack -lreflex libpiranha.la
 
 
-pirfilt_SOURCES = src/pirfilt.c src/kinematics.cpp
-pirfilt_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex
+pirfilt_SOURCES = src/pirfilt.c
+pirfilt_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
 
 kinematics.f: $(top_srcdir)/src/kinematics.mac
 	maxima --very-quiet -b $(top_srcdir)/src/kinematics.mac

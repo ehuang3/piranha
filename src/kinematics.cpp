@@ -50,51 +50,51 @@
 #include <amino.hpp>
 #include "piranha.h"
 
-
+using namespace amino;
 
 static int is_init = 0;
-static amino::DualQuat S0[2];
-static amino::Quat r_ft_rel;
+static DualQuat S0[2];
+static Quat r_ft_rel;
 
 static void kin_init(void) {
 
     // Arm
     {
-        amino::RotMat R0l(0, 0, -1,
-                         1, 0,  0,
-                         0,-1,  0);
+        RotMat R0l(0, 0, -1,
+                   1, 0,  0,
+                   0,-1,  0);
         assert( aa_tf_isrotmat( R0l.data ) );
         double x = LWA4_L_0 + PIR_L_SHOULDER_WIDTH/2 - LWA4_L_P;
 
-        S0[PIR_LEFT] = amino::DualQuat( amino::Quat(R0l),
-                                        amino::Vec3(0, x,  0) );
-        amino::RotMat R0r(0, 0, 1,
-                         -1, 0,  0,
-                          0, -1,  0);
+        S0[PIR_LEFT] = DualQuat( Quat(R0l),
+                                 Vec3(0, x,  0) );
+        RotMat R0r(0, 0, 1,
+                   -1, 0,  0,
+                   0, -1,  0);
         assert( aa_tf_isrotmat( R0r.data ) );
-        S0[PIR_RIGHT] = amino::DualQuat( amino::Quat(R0r),
-                                        amino::Vec3(0, -x,  0) );
+        S0[PIR_RIGHT] = DualQuat( Quat(R0r),
+                                  Vec3(0, -x,  0) );
 
 
-        /* amino::DualQuat Srel( amino::Quat(amino::AxisAngle( 1,0,0, M_PI )), */
-        /*                       amino::Vec3(0,0,0) ); */
+        /* DualQuat Srel( Quat(AxisAngle( 1,0,0, M_PI )), */
+        /*                       Vec3(0,0,0) ); */
 
         /* S0[PIR_RIGHT] = Srel * S0[PIR_LEFT]; */
-        /* amino::AxisAngle A0(S0[PIR_LEFT].real); */
+        /* AxisAngle A0(S0[PIR_LEFT].real); */
         /* printf("arm: "); */
         /* aa_dump_vec( stdout, A0.data, 4 ); */
     }
 
     // F/T rotation
     {
-        amino::RotMat R0( 0, 0, 1,
-                          1, 0, 0,
-                          0, 1, 0 );
+        RotMat R0( 0, 0, 1,
+                   1, 0, 0,
+                   0, 1, 0 );
         assert(aa_tf_isrotmat(R0.data));
 
-        amino::AxisAngle R_rel( 0,0,1, LWA4_FT_ANGLE );
+        AxisAngle R_rel( 0,0,1, LWA4_FT_ANGLE );
 
-        r_ft_rel = amino::Quat(R0) * amino::Quat(R_rel);
+        r_ft_rel = Quat(R0) * Quat(R_rel);
     }
 
 
@@ -108,10 +108,64 @@ static void kin_init(void) {
 }
 
 
-/* void sdh_duqu( const double q[7], double Srel[10] ) */
-/* { */
-/*     Srel[PIR_SDH_AXIAL] = */
-/* } */
+
+
+
+
+static const double lwa4_axis[][3] = {
+    {-1,0,0},   /* 01 */
+    {0,-1,0},  /* 12 */
+    {-1,0,0},  /* 23 */
+    {0,-1,0},  /* 34 */
+    {-1,0,0},  /* 45 */
+    {0,1,0}, /* 56 */
+    {1,0,0}  /* 67 */
+};
+
+static const double lwa4_trans[][3] = {
+    {0,0,0},   /* 01 */
+    {0,0,0},  /* 12 */
+    {0,0,0},  /* 23 */
+    {LWA4_L_1,0,0},  /* 34 */
+    {LWA4_L_2,0,0},  /* 45 */
+    {0,0,0}, /* 56 */
+    {0,0,0}  /* 67 */
+};
+
+void lwa4_duqu( const double *q, double *S_rel ) {
+    /* aa_tf_xxyz2duqu( -q[0],        0, 0, 0, S_rel + 0*8 ); */
+    /* aa_tf_yxyz2duqu( -q[1],        0, 0, 0, S_rel + 1*8); */
+    /* aa_tf_xxyz2duqu( -q[2],        0, 0, 0, S_rel + 2*8); */
+    /* aa_tf_yxyz2duqu( -q[3], LWA4_L_1, 0, 0, S_rel + 3*8); */
+    /* aa_tf_xxyz2duqu( -q[4], LWA4_L_2, 0, 0, S_rel + 4*8); */
+    /* aa_tf_yxyz2duqu(  q[5],        0, 0, 0, S_rel + 5*8); */
+    /* //aa_tf_xxyz2duqu(  q[6], LWA4_L_e, 0, 0, S_rel + 6*8); */
+    /* aa_tf_xxyz2duqu(  q[6],        0, 0, 0, S_rel + 6*8); */
+
+    /* Fill in S_rel with the relative dual quaternions */
+    for( size_t i = 0; i < 7; i ++ ) {
+        new (S_rel+i*8) DualQuat( AxisAngle(lwa4_axis[i], q[i]),
+                                  Vec3(lwa4_trans[i]) );
+    }
+
+
+}
+
+void lwa4_kin_duqu( const double *q, const double S0[8], const double See[8], double S[8], double *J ) {
+
+    double S_rel[8*7];
+    lwa4_duqu(q, S_rel );
+
+    double S_abs[8*7];
+    if( J ) {
+        rfx_kin_duqu_revchain( 7, S0, S_rel, See, lwa4_axis[0], S_abs, S, J, 6 );
+    } else {
+
+        rfx_kin_duqu_chain( 7, S0, S_rel, S_abs );
+        aa_tf_duqu_mul( S_abs+8*6, See, S );
+    }
+}
+
 
 int pir_kin_arm( struct pir_state *X ) {
 
