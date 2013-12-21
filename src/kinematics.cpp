@@ -118,7 +118,7 @@ static void kin_init(void) {
                                  Vec3(0,1,0).data,
                                  Vec3(SDH_L1,0,0).data );
     bodies_sdh[PIR_SDH_ID_T2] =
-        rfx_body_alloc_fixed_qv( PIR_SDH_ID_T1, PIR_SDH_ID_CENTER,
+        rfx_body_alloc_fixed_qv( PIR_SDH_ID_T1, PIR_SDH_ID_T2,
                                  aa_tf_quat_ident,
                                  Vec3(SDH_L2,0,0).data );
 
@@ -128,42 +128,21 @@ static void kin_init(void) {
                                  M_PI,
                                  Vec3(-1,0,0).data,
                                  Vec3(0,-SDH_B/2,-SDH_FC).data );
-    bodies_sdh[PIR_SDH_ID_L0] =
-        rfx_body_alloc_revolute( PIR_SDH_ID_L_AXIAL, PIR_SDH_ID_L0, PIR_SDH_L0,
-                                 0,
-                                 Vec3(0,1,0).data,
-                                 Vec3(0,0,0).data );
-    bodies_sdh[PIR_SDH_ID_L1] =
-        rfx_body_alloc_revolute( PIR_SDH_ID_L0, PIR_SDH_ID_L1, PIR_SDH_L1,
-                                 0,
-                                 Vec3(0,1,0).data,
-                                 Vec3(SDH_L1,0,0).data );
-    bodies_sdh[PIR_SDH_ID_L2] =
-         rfx_body_alloc_fixed_qv( PIR_SDH_ID_L1, PIR_SDH_ID_L2,
-                                   aa_tf_quat_ident,
-                                   Vec3(SDH_L2,0,0).data );
+    rfx_bodies_clone( PIR_SDH_ID_SIZE, bodies_sdh,
+                      PIR_SDH_ID_T0, PIR_SDH_ID_T2+1, PIR_SDH_T0,
+                      PIR_SDH_ID_CENTER,
+                      PIR_SDH_ID_L0, PIR_SDH_ID_L2+1, PIR_SDH_L0 );
+
     // right
     bodies_sdh[PIR_SDH_ID_R_AXIAL] =
         rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_R_AXIAL, PIR_SDH_AXIAL,
                                  M_PI,
                                  Vec3(1,0,0).data,
                                  Vec3(0,SDH_B/2,-SDH_FC).data );
-    bodies_sdh[PIR_SDH_ID_R0] =
-        rfx_body_alloc_revolute( PIR_SDH_ID_R_AXIAL, PIR_SDH_ID_R0, PIR_SDH_R0,
-                                 0,
-                                 Vec3(0,1,0).data,
-                                 Vec3(0,0,0).data );
-    bodies_sdh[PIR_SDH_ID_R1] =
-        rfx_body_alloc_revolute( PIR_SDH_ID_R0, PIR_SDH_ID_R1, PIR_SDH_R1,
-                                 0,
-                                 Vec3(0,1,0).data,
-                                 Vec3(SDH_L1,0,0).data );
-    bodies_sdh[PIR_SDH_ID_R2] =
-         rfx_body_alloc_fixed_qv( PIR_SDH_ID_R1, PIR_SDH_ID_R2,
-                                   aa_tf_quat_ident,
-                                   Vec3(SDH_L2,0,0).data );
-
-
+    rfx_bodies_clone( PIR_SDH_ID_SIZE, bodies_sdh,
+                      PIR_SDH_ID_T0, PIR_SDH_ID_T2+1, PIR_SDH_T0,
+                      PIR_SDH_ID_CENTER,
+                      PIR_SDH_ID_R0, PIR_SDH_ID_R2+1, PIR_SDH_R0 );
 
 
     double xl[3], xr[3];
