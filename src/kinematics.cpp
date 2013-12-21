@@ -48,6 +48,7 @@
 #include <time.h>
 #include <ach.h>
 #include <amino.hpp>
+#include <reflex.h>
 #include "piranha.h"
 
 using namespace amino;
@@ -55,6 +56,9 @@ using namespace amino;
 static int is_init = 0;
 static DualQuat S0[2];
 static Quat r_ft_rel;
+
+
+static struct rfx_body *bodies_sdh[PIR_SDH_SIZE];
 
 static void kin_init(void) {
 
@@ -97,6 +101,70 @@ static void kin_init(void) {
         r_ft_rel = Quat(R0) * Quat(R_rel);
     }
 
+    // SDH
+    bodies_sdh[PIR_SDH_ID_CENTER] =
+        rfx_body_alloc_fixed_qv( RFX_BODY_INDEX_ROOT, PIR_SDH_ID_CENTER,
+                                 aa_tf_quat_ident,
+                                 Vec3(SDH_LB,0,0).data );
+    // thumb
+    bodies_sdh[PIR_SDH_ID_T0] =
+        rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_T0, PIR_SDH_T0,
+                                 0,
+                                 Vec3(0,1,0).data,
+                                 Vec3(0,0,SDH_TC).data );
+    bodies_sdh[PIR_SDH_ID_T1] =
+        rfx_body_alloc_revolute( PIR_SDH_ID_T0, PIR_SDH_ID_T1, PIR_SDH_T1,
+                                 0,
+                                 Vec3(0,1,0).data,
+                                 Vec3(SDH_L1,0,0).data );
+    bodies_sdh[PIR_SDH_ID_T2] =
+        rfx_body_alloc_fixed_qv( PIR_SDH_ID_T1, PIR_SDH_ID_CENTER,
+                                 aa_tf_quat_ident,
+                                 Vec3(SDH_L2,0,0).data );
+
+    // left
+    bodies_sdh[PIR_SDH_ID_L_AXIAL] =
+        rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_L_AXIAL, PIR_SDH_AXIAL,
+                                 M_PI,
+                                 Vec3(-1,0,0).data,
+                                 Vec3(0,-SDH_B/2,-SDH_FC).data );
+    bodies_sdh[PIR_SDH_ID_L0] =
+        rfx_body_alloc_revolute( PIR_SDH_ID_L_AXIAL, PIR_SDH_ID_L0, PIR_SDH_L0,
+                                 0,
+                                 Vec3(0,1,0).data,
+                                 Vec3(0,0,0).data );
+    bodies_sdh[PIR_SDH_ID_L1] =
+        rfx_body_alloc_revolute( PIR_SDH_ID_L0, PIR_SDH_ID_L1, PIR_SDH_L1,
+                                 0,
+                                 Vec3(0,1,0).data,
+                                 Vec3(SDH_L1,0,0).data );
+    bodies_sdh[PIR_SDH_ID_L2] =
+         rfx_body_alloc_fixed_qv( PIR_SDH_ID_L1, PIR_SDH_ID_L2,
+                                   aa_tf_quat_ident,
+                                   Vec3(SDH_L2,0,0).data );
+    // right
+    bodies_sdh[PIR_SDH_ID_R_AXIAL] =
+        rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_R_AXIAL, PIR_SDH_AXIAL,
+                                 M_PI,
+                                 Vec3(1,0,0).data,
+                                 Vec3(0,SDH_B/2,-SDH_FC).data );
+    bodies_sdh[PIR_SDH_ID_R0] =
+        rfx_body_alloc_revolute( PIR_SDH_ID_R_AXIAL, PIR_SDH_ID_R0, PIR_SDH_R0,
+                                 0,
+                                 Vec3(0,1,0).data,
+                                 Vec3(0,0,0).data );
+    bodies_sdh[PIR_SDH_ID_R1] =
+        rfx_body_alloc_revolute( PIR_SDH_ID_R0, PIR_SDH_ID_R1, PIR_SDH_R1,
+                                 0,
+                                 Vec3(0,1,0).data,
+                                 Vec3(SDH_L1,0,0).data );
+    bodies_sdh[PIR_SDH_ID_R2] =
+         rfx_body_alloc_fixed_qv( PIR_SDH_ID_R1, PIR_SDH_ID_R2,
+                                   aa_tf_quat_ident,
+                                   Vec3(SDH_L2,0,0).data );
+
+
+
 
     double xl[3], xr[3];
     aa_tf_duqu_trans( S0[PIR_LEFT].data, xl );
@@ -105,12 +173,9 @@ static void kin_init(void) {
     printf("S0 right: " ); aa_dump_vec( stdout, xr, 3 );
 
     is_init = 1;
+
+
 }
-
-
-
-
-
 
 static const double lwa4_axis[][3] = {
     {-1,0,0},   /* 01 */
@@ -204,30 +269,43 @@ void sdh_duqu( const double q[7], double Sr[8*12] )
 void sdh_fk_duqu( const double q[7], DualQuat &S0,
                   DualQuat *St, DualQuat *Sl, DualQuat *Sr )
 {
-    double S_re[8*12] = {0};
-        sdh_duqu( q, S_re );
 
-        DualQuat Sc = S0*DualQuat(&S_re[8*PIR_SDH_CENTER]);
-        *Sl = (Sc *
-               DualQuat(&S_re[8*PIR_SDH_L_AXIAL]) *
-               DualQuat(&S_re[8*PIR_SDH_L0]) *
-               DualQuat(&S_re[8*PIR_SDH_L1]) *
-               DualQuat(&S_re[8*PIR_SDH_L2]));
+    struct aa_tf_qv Erel[PIR_SDH_ID_SIZE], Eabs[PIR_SDH_ID_SIZE];
+    QuatVec E0(S0);
 
-        *Sr = (Sc *
-               DualQuat(&S_re[8*PIR_SDH_R_AXIAL]) *
-               DualQuat(&S_re[8*PIR_SDH_R0]) *
-               DualQuat(&S_re[8*PIR_SDH_R1]) *
-               DualQuat(&S_re[8*PIR_SDH_R2]));
+    rfx_bodies_calc_tf( PIR_SDH_ID_SIZE, (const rfx_body**)bodies_sdh,
+                        q,
+                        &E0,
+                        Erel, Eabs );
+    *St = DualQuat(Eabs[PIR_SDH_ID_T2]);
+    *Sl = DualQuat(Eabs[PIR_SDH_ID_L2]);
+    *Sr = DualQuat(Eabs[PIR_SDH_ID_R2]);
 
-        *St = (Sc *
-               DualQuat(&S_re[8*PIR_SDH_T0]) *
-               DualQuat(&S_re[8*PIR_SDH_T1]) *
-               DualQuat(&S_re[8*PIR_SDH_T2]));
+    /* double S_re[8*12] = {0}; */
+    /* sdh_duqu( q, S_re ); */
+
+    /* DualQuat Sc = S0*DualQuat(&S_re[8*PIR_SDH_CENTER]); */
+    /* *Sl = (Sc * */
+    /*        DualQuat(&S_re[8*PIR_SDH_L_AXIAL]) * */
+    /*        DualQuat(&S_re[8*PIR_SDH_L0]) * */
+    /*        DualQuat(&S_re[8*PIR_SDH_L1]) * */
+    /*        DualQuat(&S_re[8*PIR_SDH_L2])); */
+
+    /* *Sr = (Sc * */
+    /*        DualQuat(&S_re[8*PIR_SDH_R_AXIAL]) * */
+    /*        DualQuat(&S_re[8*PIR_SDH_R0]) * */
+    /*        DualQuat(&S_re[8*PIR_SDH_R1]) * */
+    /*        DualQuat(&S_re[8*PIR_SDH_R2])); */
+
+    /* *St = (Sc * */
+    /*        DualQuat(&S_re[8*PIR_SDH_T0]) * */
+    /*        DualQuat(&S_re[8*PIR_SDH_T1]) * */
+    /*        DualQuat(&S_re[8*PIR_SDH_T2])); */
+
+
 }
 
 int pir_kin_arm( struct pir_state *X ) {
-
     if( !is_init) kin_init();
 
     for( size_t i = 0; i < 2; i ++ ) {

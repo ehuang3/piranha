@@ -72,8 +72,24 @@ extern "C" {
 #define PIR_SDH_L2    9
 #define PIR_SDH_T2    10
 #define PIR_SDH_R2    11
+#define PIR_SDH_SIZE  12
 
 
+enum pir_sdh_id {
+    PIR_SDH_ID_CENTER,
+    PIR_SDH_ID_T0,
+    PIR_SDH_ID_T1,
+    PIR_SDH_ID_T2,
+    PIR_SDH_ID_L_AXIAL,
+    PIR_SDH_ID_L0,
+    PIR_SDH_ID_L1,
+    PIR_SDH_ID_L2,
+    PIR_SDH_ID_R_AXIAL,
+    PIR_SDH_ID_R0,
+    PIR_SDH_ID_R1,
+    PIR_SDH_ID_R2,
+    PIR_SDH_ID_SIZE
+};
 
 // TODO: subtract inseration depth of tool changer
 #define LWA4_FT_L_fudge -1.5e-2 /* measured on physical arm */
