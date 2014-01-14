@@ -182,8 +182,8 @@ static int update_n(size_t n, size_t i, ach_channel_t *chan, struct timespec *ts
     {
         struct sns_msg_motor_state *msg = (struct sns_msg_motor_state*)buf;
         // TODO: better validation
-        if( n == msg->n &&
-            frame_size == sns_msg_motor_state_size_n(n) )
+        if( n == msg->header.n &&
+            frame_size == sns_msg_motor_state_size_n((uint32_t)n) )
         {
             for( size_t j = 0; j < n; j++ ) {
                 if( fabs(cx.state.q[i+j] -  msg->X[j].pos) > 1*M_PI/180 ) {
@@ -243,7 +243,7 @@ static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
     {
         struct sns_msg_vector *msg = (struct sns_msg_vector*)buf;
         // TODO: better validation
-        if( 6 == msg->n &&
+        if( 6 == msg->header.n &&
             frame_size == sns_msg_vector_size_n(6) )
         {
             for( size_t i = 0; i < 6; i++ ) {
@@ -349,7 +349,7 @@ static int bias_ft( void ) {
     // F = -weight * k
     size_t n_msg = sns_msg_vector_size_n(6);
     struct sns_msg_vector *msg = (struct sns_msg_vector*) alloca(n_msg);
-    msg->n = 6;
+    msg->header.n = 6;
     sns_msg_header_fill(&msg->header);
     //sns_msg_set_time( &msg->header, &t_actual, 2*period_ns );
 
