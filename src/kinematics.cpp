@@ -101,48 +101,48 @@ static void kin_init(void) {
         r_ft_rel = Quat(R0) * Quat(R_rel);
     }
 
-    // SDH
-    bodies_sdh[PIR_SDH_ID_CENTER] =
-        rfx_body_alloc_fixed_qv( RFX_BODY_INDEX_ROOT, PIR_SDH_ID_CENTER,
-                                 aa_tf_quat_ident,
-                                 Vec3(SDH_LB,0,0).data );
-    // thumb
-    bodies_sdh[PIR_SDH_ID_T0] =
-        rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_T0, PIR_SDH_T0,
-                                 0,
-                                 Vec3(0,1,0).data,
-                                 Vec3(0,0,SDH_TC).data );
-    bodies_sdh[PIR_SDH_ID_T1] =
-        rfx_body_alloc_revolute( PIR_SDH_ID_T0, PIR_SDH_ID_T1, PIR_SDH_T1,
-                                 0,
-                                 Vec3(0,1,0).data,
-                                 Vec3(SDH_L1,0,0).data );
-    bodies_sdh[PIR_SDH_ID_T2] =
-        rfx_body_alloc_fixed_qv( PIR_SDH_ID_T1, PIR_SDH_ID_T2,
-                                 aa_tf_quat_ident,
-                                 Vec3(SDH_L2,0,0).data );
+    /* // SDH */
+    /* bodies_sdh[PIR_SDH_ID_CENTER] = */
+    /*     rfx_body_alloc_fixed_qv( RFX_BODY_INDEX_ROOT, PIR_SDH_ID_CENTER, */
+    /*                              aa_tf_quat_ident, */
+    /*                              Vec3(SDH_LB,0,0).data ); */
+    /* // thumb */
+    /* bodies_sdh[PIR_SDH_ID_T0] = */
+    /*     rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_T0, PIR_SDH_T0, */
+    /*                              0, */
+    /*                              Vec3(0,1,0).data, */
+    /*                              Vec3(0,0,SDH_TC).data ); */
+    /* bodies_sdh[PIR_SDH_ID_T1] = */
+    /*     rfx_body_alloc_revolute( PIR_SDH_ID_T0, PIR_SDH_ID_T1, PIR_SDH_T1, */
+    /*                              0, */
+    /*                              Vec3(0,1,0).data, */
+    /*                              Vec3(SDH_L1,0,0).data ); */
+    /* bodies_sdh[PIR_SDH_ID_T2] = */
+    /*     rfx_body_alloc_fixed_qv( PIR_SDH_ID_T1, PIR_SDH_ID_T2, */
+    /*                              aa_tf_quat_ident, */
+    /*                              Vec3(SDH_L2,0,0).data ); */
 
-    // left
-    bodies_sdh[PIR_SDH_ID_L_AXIAL] =
-        rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_L_AXIAL, PIR_SDH_AXIAL,
-                                 M_PI,
-                                 Vec3(-1,0,0).data,
-                                 Vec3(0,-SDH_B/2,-SDH_FC).data );
-    rfx_bodies_clone( PIR_SDH_ID_SIZE, bodies_sdh,
-                      PIR_SDH_ID_T0, PIR_SDH_ID_T2+1, PIR_SDH_T0,
-                      PIR_SDH_ID_CENTER,
-                      PIR_SDH_ID_L0, PIR_SDH_ID_L2+1, PIR_SDH_L0 );
+    /* // left */
+    /* bodies_sdh[PIR_SDH_ID_L_AXIAL] = */
+    /*     rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_L_AXIAL, PIR_SDH_AXIAL, */
+    /*                              M_PI, */
+    /*                              Vec3(-1,0,0).data, */
+    /*                              Vec3(0,-SDH_B/2,-SDH_FC).data ); */
+    /* rfx_bodies_clone( PIR_SDH_ID_SIZE, bodies_sdh, */
+    /*                   PIR_SDH_ID_T0, PIR_SDH_ID_T2+1, PIR_SDH_T0, */
+    /*                   PIR_SDH_ID_CENTER, */
+    /*                   PIR_SDH_ID_L0, PIR_SDH_ID_L2+1, PIR_SDH_L0 ); */
 
-    // right
-    bodies_sdh[PIR_SDH_ID_R_AXIAL] =
-        rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_R_AXIAL, PIR_SDH_AXIAL,
-                                 M_PI,
-                                 Vec3(1,0,0).data,
-                                 Vec3(0,SDH_B/2,-SDH_FC).data );
-    rfx_bodies_clone( PIR_SDH_ID_SIZE, bodies_sdh,
-                      PIR_SDH_ID_T0, PIR_SDH_ID_T2+1, PIR_SDH_T0,
-                      PIR_SDH_ID_CENTER,
-                      PIR_SDH_ID_R0, PIR_SDH_ID_R2+1, PIR_SDH_R0 );
+    /* // right */
+    /* bodies_sdh[PIR_SDH_ID_R_AXIAL] = */
+    /*     rfx_body_alloc_revolute( PIR_SDH_ID_CENTER, PIR_SDH_ID_R_AXIAL, PIR_SDH_AXIAL, */
+    /*                              M_PI, */
+    /*                              Vec3(1,0,0).data, */
+    /*                              Vec3(0,SDH_B/2,-SDH_FC).data ); */
+    /* rfx_bodies_clone( PIR_SDH_ID_SIZE, bodies_sdh, */
+    /*                   PIR_SDH_ID_T0, PIR_SDH_ID_T2+1, PIR_SDH_T0, */
+    /*                   PIR_SDH_ID_CENTER, */
+    /*                   PIR_SDH_ID_R0, PIR_SDH_ID_R2+1, PIR_SDH_R0 ); */
 
 
     double xl[3], xr[3];
@@ -249,37 +249,37 @@ void sdh_fk_duqu( const double q[7], DualQuat &S0,
                   DualQuat *St, DualQuat *Sl, DualQuat *Sr )
 {
 
-    struct aa_tf_qv Erel[PIR_SDH_ID_SIZE], Eabs[PIR_SDH_ID_SIZE];
-    QuatVec E0(S0);
+    /* struct aa_tf_qv Erel[PIR_SDH_ID_SIZE], Eabs[PIR_SDH_ID_SIZE]; */
+    /* QuatVec E0(S0); */
 
-    rfx_bodies_calc_tf( PIR_SDH_ID_SIZE, (const rfx_body**)bodies_sdh,
-                        q,
-                        &E0,
-                        Erel, Eabs );
-    *St = DualQuat(Eabs[PIR_SDH_ID_T2]);
-    *Sl = DualQuat(Eabs[PIR_SDH_ID_L2]);
-    *Sr = DualQuat(Eabs[PIR_SDH_ID_R2]);
+    /* rfx_bodies_calc_tf( PIR_SDH_ID_SIZE, (const rfx_body**)bodies_sdh, */
+    /*                     q, */
+    /*                     &E0, */
+    /*                     Erel, Eabs ); */
+    /* *St = DualQuat(Eabs[PIR_SDH_ID_T2]); */
+    /* *Sl = DualQuat(Eabs[PIR_SDH_ID_L2]); */
+    /* *Sr = DualQuat(Eabs[PIR_SDH_ID_R2]); */
 
-    /* double S_re[8*12] = {0}; */
-    /* sdh_duqu( q, S_re ); */
+    double S_re[8*12] = {0};
+    sdh_duqu( q, S_re );
 
-    /* DualQuat Sc = S0*DualQuat(&S_re[8*PIR_SDH_CENTER]); */
-    /* *Sl = (Sc * */
-    /*        DualQuat(&S_re[8*PIR_SDH_L_AXIAL]) * */
-    /*        DualQuat(&S_re[8*PIR_SDH_L0]) * */
-    /*        DualQuat(&S_re[8*PIR_SDH_L1]) * */
-    /*        DualQuat(&S_re[8*PIR_SDH_L2])); */
+    DualQuat Sc = S0*DualQuat(&S_re[8*PIR_SDH_CENTER]);
+    *Sl = (Sc *
+           DualQuat(&S_re[8*PIR_SDH_L_AXIAL]) *
+           DualQuat(&S_re[8*PIR_SDH_L0]) *
+           DualQuat(&S_re[8*PIR_SDH_L1]) *
+           DualQuat(&S_re[8*PIR_SDH_L2]));
 
-    /* *Sr = (Sc * */
-    /*        DualQuat(&S_re[8*PIR_SDH_R_AXIAL]) * */
-    /*        DualQuat(&S_re[8*PIR_SDH_R0]) * */
-    /*        DualQuat(&S_re[8*PIR_SDH_R1]) * */
-    /*        DualQuat(&S_re[8*PIR_SDH_R2])); */
+    *Sr = (Sc *
+           DualQuat(&S_re[8*PIR_SDH_R_AXIAL]) *
+           DualQuat(&S_re[8*PIR_SDH_R0]) *
+           DualQuat(&S_re[8*PIR_SDH_R1]) *
+           DualQuat(&S_re[8*PIR_SDH_R2]));
 
-    /* *St = (Sc * */
-    /*        DualQuat(&S_re[8*PIR_SDH_T0]) * */
-    /*        DualQuat(&S_re[8*PIR_SDH_T1]) * */
-    /*        DualQuat(&S_re[8*PIR_SDH_T2])); */
+    *St = (Sc *
+           DualQuat(&S_re[8*PIR_SDH_T0]) *
+           DualQuat(&S_re[8*PIR_SDH_T1]) *
+           DualQuat(&S_re[8*PIR_SDH_T2]));
 
 
 }

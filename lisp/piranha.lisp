@@ -140,11 +140,11 @@
   )
 
 
-(defun read-doubles (pointer size)
+(defun read-doubles (pointer size &optional (offset 0))
   (let ((x (make-array size :element-type 'double-float)))
     (dotimes (i size)
       (setf (aref x i)
-            (mem-aref pointer :double i)))
+            (mem-aref pointer :double (+ i offset))))
     x))
 
 (defun get-state ()

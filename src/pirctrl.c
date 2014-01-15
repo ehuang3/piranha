@@ -74,83 +74,109 @@ static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
 struct pir_mode_desc mode_desc[] = {
     {"left-shoulder",
      set_mode_cpy,
-     ctrl_joint_left_shoulder},
+     ctrl_joint_left_shoulder,
+     NULL},
     {"left-wrist",
      set_mode_cpy,
-     ctrl_joint_left_wrist},
+     ctrl_joint_left_wrist,
+     NULL},
     {"right-shoulder",
      set_mode_cpy,
-     ctrl_joint_right_shoulder},
+     ctrl_joint_right_shoulder,
+     NULL},
     {"right-wrist",
      set_mode_cpy,
-     ctrl_joint_right_wrist},
+     ctrl_joint_right_wrist,
+     NULL},
     {"ws-left",
      set_mode_ws_left,
-     ctrl_ws_left},
+     ctrl_ws_left,
+     NULL},
     {"ws-left-finger",
      set_mode_ws_left_finger,
-     ctrl_ws_left_finger},
+     ctrl_ws_left_finger,
+     NULL},
     {"ws-right",
      set_mode_ws_right,
-     ctrl_ws_right},
+     ctrl_ws_right,
+     NULL},
     {"ws-right-finger",
      set_mode_ws_right_finger,
-     ctrl_ws_right_finger},
+     ctrl_ws_right_finger,
+     NULL},
     {"zero",
      set_mode_cpy,
-     ctrl_zero},
+     ctrl_zero,
+     NULL},
     {"sin",
      set_mode_sin,
-     ctrl_sin},
+     ctrl_sin,
+     NULL},
     {"step",
      set_mode_cpy,
-     ctrl_step},
+     ctrl_step,
+     NULL},
     {"trajx-left",
      set_mode_trajx_left,
-     ctrl_trajx_left},
+     ctrl_trajx_left,
+     NULL},
     {"trajx-right",
      set_mode_trajx_right,
-     ctrl_trajx_right},
+     ctrl_trajx_right,
+     NULL},
     {"trajx-w-left",
      set_mode_trajx_w_left,
-     ctrl_trajx_w_left},
+     ctrl_trajx_w_left,
+     NULL},
     {"trajx-w-right",
      set_mode_trajx_w_right,
-     ctrl_trajx_w_right},
+     ctrl_trajx_w_right,
+     NULL},
     {"trajq-left",
      set_mode_trajq_left,
-     ctrl_trajq_left},
+     ctrl_trajq_left,
+     NULL},
     {"trajq-right",
      set_mode_trajq_right,
-     ctrl_trajq_right},
+     ctrl_trajq_right,
+     NULL},
     {"trajq-lr",
      set_mode_trajq_lr,
-     ctrl_trajq_lr},
+     ctrl_trajq_lr,
+     NULL},
     {"trajq-torso",
      set_mode_trajq_torso,
-     ctrl_trajq_torso},
+     ctrl_trajq_torso,
+     NULL},
     {"sdh-set-left",
      sdh_set_left,
+     NULL,
      NULL},
     {"sdh-set-right",
      sdh_set_right,
+     NULL,
      NULL},
     {"pinch-left",
      sdh_pinch_left,
+     NULL,
      NULL},
     {"pinch-right",
      sdh_pinch_right,
+     NULL,
      NULL},
     {"k-pt",
      set_mode_k_pt,
+     NULL,
      NULL},
     {"k-pr",
      set_mode_k_pr,
+     NULL,
      NULL},
     {"k-f",
      set_mode_k_f,
+     NULL,
      NULL},
-    {NULL, NULL, NULL} };
+    {NULL, NULL, NULL, NULL} };
 
 
 static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
@@ -359,7 +385,7 @@ static void update(void) {
         switch(r) {
         case ACH_OK:
         case ACH_MISSED_FRAME:
-            if( msg->n == JS_AXES &&
+            if( msg->header.n == JS_AXES &&
                 frame_size == sns_msg_joystick_size(msg) )
             {
                 if( msg->buttons & GAMEPAD_BUTTON_B ) {
@@ -370,7 +396,7 @@ static void update(void) {
                     memset(cx.ref.user, 0, sizeof(cx.ref.user[0])*JS_AXES);
                     cx.mode = NULL;
                 } else {
-                    memcpy(cx.ref.user, msg->axis, sizeof(cx.ref.user[0])*msg->n);
+                    memcpy(cx.ref.user, msg->axis, sizeof(cx.ref.user[0])*msg->header.n);
                     cx.ref.user_button = msg->buttons;
                 }
             }
@@ -402,9 +428,9 @@ static void set_mode(void) {
         for( size_t i = 0; mode_desc[i].name != NULL; i ++ ) {
             if( 0 == strcmp(msg_ctrl->mode, mode_desc[i].name) ) {
                 printf("found mode: %s\n", mode_desc[i].name);
-                if( mode_desc[i].setmode ) {
-                    if( 0 == mode_desc[i].setmode( &cx, msg_ctrl ) &&
-                        mode_desc[i].ctrl )
+                if( mode_desc[i].init ) {
+                    if( 0 == mode_desc[i].init( &cx, msg_ctrl ) &&
+                        mode_desc[i].run )
                     {
                         memcpy( &cx.msg_ctrl, msg_ctrl, sizeof(cx.msg_ctrl) );
                         cx.mode = &mode_desc[i];
@@ -420,8 +446,15 @@ static void set_mode(void) {
 static void control(void) {
     // dispatch
     memset( cx.ref.dq, 0, sizeof(cx.ref.dq[0])*PIR_AXIS_CNT );
-    if( cx.mode && cx.mode->ctrl ) {
-        cx.mode->ctrl( &cx );
+    if( cx.mode ) {
+        if( cx.mode->term&&
+            cx.mode->term(&cx) )
+        {
+            aa_mem_region_release(&cx.modereg);
+            cx.mode = NULL;
+        } else if ( cx.mode->run ) {
+            cx.mode->run( &cx );
+        }
     }
 
     // send ref

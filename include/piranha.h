@@ -79,14 +79,26 @@ enum pir_sdh_id {
     PIR_SDH_ID_CENTER,
     PIR_SDH_ID_T0,
     PIR_SDH_ID_T1,
+    PIR_SDH_ID_TK0M,
+    PIR_SDH_ID_TK0P,
+    PIR_SDH_ID_TK1M,
+    PIR_SDH_ID_TK1P,
     PIR_SDH_ID_T2,
     PIR_SDH_ID_L_AXIAL,
     PIR_SDH_ID_L0,
     PIR_SDH_ID_L1,
+    PIR_SDH_ID_LK0M,
+    PIR_SDH_ID_LK0P,
+    PIR_SDH_ID_LK1M,
+    PIR_SDH_ID_LK1P,
     PIR_SDH_ID_L2,
     PIR_SDH_ID_R_AXIAL,
     PIR_SDH_ID_R0,
     PIR_SDH_ID_R1,
+    PIR_SDH_ID_RK0M,
+    PIR_SDH_ID_RK0P,
+    PIR_SDH_ID_RK1M,
+    PIR_SDH_ID_RK1P,
     PIR_SDH_ID_R2,
     PIR_SDH_ID_SIZE
 };
@@ -115,6 +127,15 @@ enum pir_sdh_id {
 #define SDH_B 66e-3       ///< distance between fingers
 #define SDH_TC 38.105e-3  ///< Thumb to center point
 #define SDH_FC 19.053e-3  ///< Fingers line to center point
+
+
+
+#define SDH_L_FINGER (2.785e-2) ///< width of finger
+#define SDH_L_K1 (3.18e-2)      ///< upper knuckle
+#define SDH_L0M (SDH_L_FINGER/2 + 0.5562e-2) ///< finger middle to lower knuckle, y-
+#define SDH_L0P (SDH_L_FINGER/2 + 1.251e-2) ///< finger middle to lower knuckle, y+
+#define SDH_L1M (SDH_L_FINGER/2 + 0) ///< finger middle to upper knuckle, y-
+#define SDH_L1P (SDH_L_K1 - SDH_L_FINGER/2)  ///< finger middle to upper knuckle, y+
 
 #define SDH_MASS 1.955                    ///< SDH Mass (kilograms)
 #define SDH_WEIGHT (SDH_MASS*AA_K_STD_G)  ///< SDH Weight (Newton)
@@ -220,6 +241,7 @@ struct pir_msg_complete {
 };
 
 struct pir_mode_desc;
+struct pir_mode;
 
 #define JS_AXES 8
 typedef struct {
@@ -270,14 +292,21 @@ typedef struct {
 } pirctrl_cx_t;
 
 /*------ MODES --------*/
-typedef void (*pir_ctrl_fun_t)( pirctrl_cx_t *);
-typedef int (*pir_mode_fun_t)(pirctrl_cx_t *, struct pir_msg *);
+typedef void (*pir_mode_run_fun_t)( pirctrl_cx_t *);
+typedef int (*pir_mode_init_fun_t)(pirctrl_cx_t *, struct pir_msg *);
+typedef int (*pir_mode_terminate_fun_t)(pirctrl_cx_t *);
 
 struct pir_mode_desc {
     const char *name;
-    pir_mode_fun_t setmode;
-    pir_ctrl_fun_t ctrl;
+    pir_mode_init_fun_t init;
+    pir_mode_run_fun_t run;
+    pir_mode_terminate_fun_t term;
 };
+
+/* struct pir_mode { */
+/*     struct pir_mode_desc *desc; */
+/*     // more data */
+/* } */
 
 int set_mode_k_s2min(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_k_pt(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
