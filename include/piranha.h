@@ -46,6 +46,8 @@
 #include <amino.h>
 #include <reflex.h>
 
+#include "pir-frame.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -103,42 +105,6 @@ enum pir_sdh_id {
     PIR_SDH_ID_SIZE
 };
 
-// TODO: subtract inseration depth of tool changer
-#define LWA4_FT_L_fudge -1.5e-2 /* measured on physical arm */
-#define LWA4_FT_L (82.2e-3 + LWA4_FT_L_fudge) ///< Length of F/T Sensor
-#define LWA4_FT_ANGLE (45*M_PI/180)
-
-
-#define LWA4_L_P_fudge (-.5e-2)   /* offset, measured with arm */
-#define LWA4_L_P (0.05 + LWA4_L_P_fudge)   /* pedestal height, measured */
-#define LWA4_L_0 (0.3000) /* pedestal base to shoulder */
-#define LWA4_L_1 (0.6280 - LWA4_L_0) /* shoulder to elbow */
-#define LWA4_L_2 (0.9510 - LWA4_L_1 - LWA4_L_0) /* elbow to wrist */
-#define LWA4_L_e (1.0334 - LWA4_L_2 - LWA4_L_1 - LWA4_L_0) /* wrist to E.E end of powerball */
-
-#define PIR_L_SHOULDER_WIDTH (6.35e-2) /* width of shoulder mount middle section */
-
-
-// TODO: Adjust for new tool changer
-
-#define SDH_LB 98e-3      ///< Base connector to finger joint
-#define SDH_L1 0.0865     ///< Lower finger joint
-#define SDH_L2 0.0675     ///< Upper finger joint
-#define SDH_B 66e-3       ///< distance between fingers
-#define SDH_TC 38.105e-3  ///< Thumb to center point
-#define SDH_FC 19.053e-3  ///< Fingers line to center point
-
-
-
-#define SDH_L_FINGER (2.785e-2) ///< width of finger
-#define SDH_L_K1 (3.18e-2)      ///< upper knuckle
-#define SDH_L0M (SDH_L_FINGER/2 + 0.5562e-2) ///< finger middle to lower knuckle, y-
-#define SDH_L0P (SDH_L_FINGER/2 + 1.251e-2) ///< finger middle to lower knuckle, y+
-#define SDH_L1M (SDH_L_FINGER/2 + 0) ///< finger middle to upper knuckle, y-
-#define SDH_L1P (SDH_L_K1 - SDH_L_FINGER/2)  ///< finger middle to upper knuckle, y+
-
-#define SDH_MASS 1.955                    ///< SDH Mass (kilograms)
-#define SDH_WEIGHT (SDH_MASS*AA_K_STD_G)  ///< SDH Weight (Newton)
 
 typedef enum pir_side  {
     PIR_LEFT,
@@ -197,6 +163,11 @@ enum pir_axis {
     }
 
 // TODO: all transforms, jacobians, forces, in global frame
+
+struct pir_config {
+    double q[PIR_TF_CONFIG_MAX];
+    double dq[PIR_TF_CONFIG_MAX];
+};
 
 struct pir_state {
     double q[PIR_AXIS_CNT];

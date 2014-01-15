@@ -74,6 +74,7 @@ typedef struct {
 
     double r_ft[2][4];    ///< Absolute F/T rotation
 
+    struct pir_config Q;
     struct pir_state state;
     struct timespec now;
 
@@ -300,33 +301,26 @@ static void update(void) {
     int u_fl = update_ft( cx.F_raw[PIR_LEFT], &cx.chan_ft_left, &timeout );
     int u_fr = update_ft( cx.F_raw[PIR_RIGHT], &cx.chan_ft_right, &timeout );
 
-
     is_updated = is_updated || u_fl || u_fr;
 
-    /* if( u_sl ) { */
-    /*     update_sdh(); */
-    /*     // TODO: right hand */
-    /* } */
-
-    // update kinematics
-    /* if( u_l || u_sl ) { */
-    /*     lwa4_kin_duqu( &cx.state.q[PIR_AXIS_L0], cx.S0, cx.See, */
-    /*                    cx.state.S_L, cx.state.J_L  ); */
-    /*     aa_tf_qmul( cx.state.S_L, cx.r_ft_rel, cx.r_ft_L ); */
-    /* } */
-    /* if( u_r ) { */
-    /*     lwa4_kin_duqu( &cx.state.q[PIR_AXIS_R0], cx.S0, cx.See, */
-    /*                    cx.state.S_R, cx.state.J_R  ); */
-    /*     aa_tf_qmul( cx.state.S_R, cx.r_ft_rel, cx.r_ft_R ); */
-    /* } */
-
-    /* if( u_l || u_fl ) rotate_ft( cx.r_ft_L, cx.F_raw_L, cx.state.F_L ); */
-    /* if( u_r || u_fr ) rotate_ft( cx.r_ft_R, cx.F_raw_R, cx.state.F_R ); */
-
-
-    //if( u_l || u_fl ) aa_dump_vec( stdout, cx.state.F_L, 3 );
-
     if( is_updated ) {
+
+        // copy state
+        AA_MEM_CPY( &cx.Q.q[PIR_TF_LEFT_Q_SHOULDER0], &cx.state.q[PIR_AXIS_L0], 7 );
+        AA_MEM_CPY( &cx.Q.q[PIR_TF_RIGHT_Q_SHOULDER0], &cx.state.q[PIR_AXIS_R0], 7 );
+
+        // update transforms
+        double *tf_rel = (double*)aa_mem_region_local_alloc( 7 * PIR_TF_FRAME_MAX * sizeof(tf_rel[0]) );
+        double *tf_abs = (double*)aa_mem_region_local_alloc( 7 * PIR_TF_FRAME_MAX * sizeof(tf_abs[0]) );
+        pir_tf_rel( cx.Q.q, tf_rel );
+        pir_tf_abs( tf_rel, tf_abs );
+
+        /* // testing */
+        /* double tf_abs_old[7]; */
+        /* aa_tf_duqu2qutr( cx.state.S_wp[PIR_LEFT], tf_abs_old ); */
+        /* printf("old: "); aa_dump_vec( stdout, tf_abs_old, 7 ); */
+        /* printf("new: "); aa_dump_vec( stdout, tf_abs+7*PIR_TF_LEFT_WRIST2, 7 ); */
+
         // compute kinematics
         pir_kin_arm( &cx.state );
         pir_kin_ft( &cx.state, cx.F_raw, cx.r_ft);

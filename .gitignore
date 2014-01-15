@@ -36,3 +36,5 @@
 /core
 /out
 /testkin
+/pir-frame.c
+/pir-frame.h
