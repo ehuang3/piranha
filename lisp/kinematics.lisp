@@ -118,6 +118,54 @@
             :axis (1 0 0)
             :translation (0 0 0))))
 
+
+(defun sdh-finger (parent prefix z)
+  (reflex:prefix-frames
+   parent prefix
+   `((:frame :name "0"
+             :configuration "Q_0"
+             :type :revolute
+             :axis (0 1 0)
+             :translation (0 0 ,z))
+     (:frame :name "1"
+             :configuration "Q_1"
+             :parent "0"
+             :type :revolute
+             :axis (0 1 0)
+             :translation ("SDH_L1" 0 0))
+     ;; finger tip
+     ,(reflex:make-fixed-frame "2" "1" (aa:x-angle 0) :x "SDH_L2")
+     ;; Knuckles
+     ,(reflex:make-fixed-frame "K0M" parent (aa:x-angle 0)  :y "-SDH_L0M" :z z)
+     ,(reflex:make-fixed-frame "K0P" parent (aa:x-angle 0)  :y "SDH_L0P" :z z)
+     ,(reflex:make-fixed-frame "K1M" "1" (aa:x-angle 0)  :x "SDH_L1" :y "-SDH_L0M")
+     ,(reflex:make-fixed-frame "K1P" "1" (aa:x-angle 0)  :x "SDH_L1" :y "SDH_L0P")
+     )))
+
+(defun sdh (parent prefix)
+  (reflex:prefix-frames
+   parent prefix
+   `(,(reflex:make-fixed-frame "BASE" nil (aa:x-angle (* 60 (/ pi 180))) :x "LWA4_L_e + LWA4_FT_L")
+      ,(reflex:make-fixed-frame "CENTER" "BASE" (aa:x-angle 0) :x "SDH_LB")
+      ,(reflex:make-fixed-frame "FINGERTIP" "BASE" (aa:x-angle 0))
+      (:frame :name "L_AXIAL"
+              :parent "CENTER"
+              :type :revolute
+              :configuration "Q_AXIAL"
+              :offset "M_PI"
+              :axis (-1 0 0)
+              :translation (0 "-SDH_B/2" "-SDH_FC"))
+      (:frame :name "R_AXIAL"
+              :parent "CENTER"
+              :type :revolute
+              :configuration "Q_AXIAL"
+              :offset "M_PI"
+              :axis (1 0 0)
+              :translation (0 "SDH_B/2" "-SDH_FC"))
+      ,@(sdh-finger "CENTER" "T_" "SDH_TC")
+      ,@(sdh-finger "L_AXIAL" "L_" 0)
+      ,@(sdh-finger "R_AXIAL" "R_" 0))))
+
 (defparameter *pir-arm*
   `( ,@*lwa4-frames*
     ,(reflex:make-fixed-frame "FT" "WRIST2"
@@ -144,7 +192,10 @@
                                                                '(1 0 0)))
                                :y "-(LWA4_L_0 + PIR_L_SHOULDER_WIDTH/2 - LWA4_L_P)"))
    (reflex:prefix-frames "LEFT_BASE" "LEFT_" *pir-arm*)
-   (reflex:prefix-frames "LEFT_BASE" "RIGHT_" *pir-arm*)))
+   (reflex:prefix-frames "RIGHT_BASE" "RIGHT_" *pir-arm*)
+   (sdh "LEFT_WRIST2" "LEFT_SDH_")
+   (sdh "RIGHT_WRIST2" "RIGHT_SDH_")
+   ))
 
 
 (let ((frames (reflex:prefix-frames nil "PIR_TF_" (pir-frames))))
@@ -155,4 +206,5 @@
                             :relative-function "pir_tf_rel"
                             :absolute-function "pir_tf_abs"
                             :parents-array "pir_tf_parents"
+                            :dot-file "pir-frame.dot"
                             :headers '("pir-frame.h")))

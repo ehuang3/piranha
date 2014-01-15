@@ -37,5 +37,11 @@ pirfilt_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpi
 pir-frame.c: lisp/kinematics.lisp
 	sbcl --script lisp/kinematics.lisp
 
+pir-frame.dot: pir-frame.c
+pir-frame.h: pir-frame.c
+
+pir-frame.pdf: pir-frame.dot
+	dot pir-frame.dot -Tpdf > pir-frame.pdf
+
 kinematics.f: $(top_srcdir)/src/kinematics.mac
 	maxima --very-quiet -b $(top_srcdir)/src/kinematics.mac

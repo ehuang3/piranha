@@ -38,3 +38,6 @@
 /testkin
 /pir-frame.c
 /pir-frame.h
+/pir-frame.dot
+/pir-frame.pdf
+/pir-tf.dot
