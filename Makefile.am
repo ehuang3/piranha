@@ -34,6 +34,8 @@ testkin_LDADD = -lsns  -lamino -lsocanmatic -lblas -llapack -lreflex libpiranha.
 pirfilt_SOURCES = src/pirfilt.c
 pirfilt_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
 
+BUILT_SOURCES = pir-frame.h pir-frame.c
+
 pir-frame.c: lisp/kinematics.lisp
 	sbcl --script lisp/kinematics.lisp
 
@@ -45,3 +47,7 @@ pir-frame.pdf: pir-frame.dot
 
 kinematics.f: $(top_srcdir)/src/kinematics.mac
 	maxima --very-quiet -b $(top_srcdir)/src/kinematics.mac
+
+
+clean-local:
+	rm -f pir-frame.h pir-frame.c pir-frame.dot

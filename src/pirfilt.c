@@ -277,6 +277,7 @@ static int update_ft(double *F, ach_channel_t *chan, struct timespec *ts ) {
 /*     // TODO: torque */
 /* } */
 
+
 static void update(void) {
 
     if( clock_gettime( ACH_DEFAULT_CLOCK, &cx.now ) )
@@ -305,15 +306,66 @@ static void update(void) {
 
     if( is_updated ) {
 
+        // compute kinematics (old way)
+        pir_kin_arm( &cx.state );
+
         // copy state
         AA_MEM_CPY( &cx.Q.q[PIR_TF_LEFT_Q_SHOULDER0], &cx.state.q[PIR_AXIS_L0], 7 );
         AA_MEM_CPY( &cx.Q.q[PIR_TF_RIGHT_Q_SHOULDER0], &cx.state.q[PIR_AXIS_R0], 7 );
+        AA_MEM_CPY( &cx.Q.q[PIR_TF_LEFT_SDH_Q_AXIAL], &cx.state.q[PIR_AXIS_SDH_L0], 7 );
+        AA_MEM_CPY( &cx.Q.q[PIR_TF_RIGHT_SDH_Q_AXIAL], &cx.state.q[PIR_AXIS_SDH_R0], 7 );
 
-        // update transforms
+        // Update Relative Transforms
         double *tf_rel = (double*)aa_mem_region_local_alloc( 7 * PIR_TF_FRAME_MAX * sizeof(tf_rel[0]) );
-        double *tf_abs = (double*)aa_mem_region_local_alloc( 7 * PIR_TF_FRAME_MAX * sizeof(tf_abs[0]) );
         pir_tf_rel( cx.Q.q, tf_rel );
+
+        // Compute absolute TFs
+        double *tf_abs = (double*)aa_mem_region_local_alloc( 7 * PIR_TF_FRAME_MAX * sizeof(tf_abs[0]) );
         pir_tf_abs( tf_rel, tf_abs );
+
+        // Hack in fingertips
+        {
+            double *v_ll = &tf_abs[7*PIR_TF_LEFT_SDH_L_2 + 4];
+            double *v_lr = &tf_abs[7*PIR_TF_LEFT_SDH_R_2 + 4];
+
+            double *v_rl = &tf_abs[7*PIR_TF_RIGHT_SDH_L_2 + 4];
+            double *v_rr = &tf_abs[7*PIR_TF_RIGHT_SDH_R_2 + 4];
+
+
+            for( size_t i = 0; i < 3; i ++ ) {
+                tf_abs[7*PIR_TF_LEFT_SDH_FINGERTIP  + 4 + i ] = (v_ll[i] + v_lr[i]) / 2;
+                tf_abs[7*PIR_TF_RIGHT_SDH_FINGERTIP + 4 + i ] = (v_rl[i] + v_rr[i]) / 2;
+            }
+        }
+        // copy relative E.E. pose
+
+        {
+            double E_eer_l[7];
+            double E_eer_r[7];
+            aa_tf_qutr_cmul( &tf_abs[7*PIR_TF_LEFT_WRIST2], &tf_abs[7*PIR_TF_LEFT_SDH_FINGERTIP],
+                             E_eer_l );
+            aa_tf_qutr_cmul( &tf_abs[7*PIR_TF_RIGHT_WRIST2], &tf_abs[7*PIR_TF_RIGHT_SDH_FINGERTIP],
+                             E_eer_r );
+            aa_tf_qutr2duqu( E_eer_l, cx.state.S_eer[PIR_LEFT] );
+            aa_tf_qutr2duqu( E_eer_r, cx.state.S_eer[PIR_RIGHT] );
+
+            /* double E_eer_old_l[7]; */
+            /* double E_eer_old_r[7]; */
+            /* //aa_tf_duqu_mul( cx.state.S_wp[PIR_LEFT],  cx.state.S_eer[PIR_LEFT], S_ee ); */
+            /* aa_tf_duqu_normalize( cx.state.S_eer[PIR_LEFT] ); */
+            /* aa_tf_duqu_normalize( cx.state.S_eer[PIR_RIGHT] ); */
+            /* aa_tf_duqu2qutr( cx.state.S_eer[PIR_LEFT],  E_eer_old_l ); */
+            /* aa_tf_duqu2qutr( cx.state.S_eer[PIR_RIGHT],  E_eer_old_r ); */
+            /* printf("==\n"); */
+            /* printf("ol: "); aa_dump_vec( stdout, E_eer_old_l, 7 ); */
+            /* printf("nl: "); aa_dump_vec( stdout, E_eer_l, 7 ); */
+            /* printf("--\n"); */
+            /* printf("or: "); aa_dump_vec( stdout, E_eer_old_r, 7 ); */
+            /* printf("nr: "); aa_dump_vec( stdout, E_eer_r, 7 ); */
+        }
+
+        // update ft
+        pir_kin_ft( tf_abs, &cx.state, cx.F_raw, cx.r_ft);
 
         /* // testing */
         /* double tf_abs_old[7]; */
@@ -321,9 +373,14 @@ static void update(void) {
         /* printf("old: "); aa_dump_vec( stdout, tf_abs_old, 7 ); */
         /* printf("new: "); aa_dump_vec( stdout, tf_abs+7*PIR_TF_LEFT_WRIST2, 7 ); */
 
-        // compute kinematics
-        pir_kin_arm( &cx.state );
-        pir_kin_ft( &cx.state, cx.F_raw, cx.r_ft);
+
+
+        /* aa_tf_qutr_cmul( &tf_abs[PIR_TF_LEFT_WRIST2], &tf_abs[PIR_TF_LEFT_SDH_L_2], E_eer_new_a ); */
+        /* aa_tf_qutr_cmul( &tf_abs[PIR_TF_LEFT_WRIST2], &tf_abs[PIR_TF_LEFT_SDH_R_2], E_eer_new_b ); */
+        /* printf("old: "); aa_dump_vec( stdout, E_eer_old, 7 ); */
+        /* printf("a:   "); aa_dump_vec( stdout, E_eer_new_a, 7 ); */
+        /* printf("b:   "); aa_dump_vec( stdout, E_eer_new_b, 7 ); */
+
 
         // send
         ach_status_t r = ach_put( &cx.chan_state_pir, &cx.state,

@@ -55,7 +55,6 @@ using namespace amino;
 
 static int is_init = 0;
 static DualQuat S0[2];
-static Quat r_ft_rel;
 
 
 static struct rfx_body *bodies_sdh[PIR_SDH_SIZE];
@@ -89,17 +88,17 @@ static void kin_init(void) {
         /* aa_dump_vec( stdout, A0.data, 4 ); */
     }
 
-    // F/T rotation
-    {
-        RotMat R0( 0, 0, 1,
-                   1, 0, 0,
-                   0, 1, 0 );
-        assert(aa_tf_isrotmat(R0.data));
+    /* // F/T rotation */
+    /* { */
+    /*     RotMat R0( 0, 0, 1, */
+    /*                1, 0, 0, */
+    /*                0, 1, 0 ); */
+    /*     assert(aa_tf_isrotmat(R0.data)); */
 
-        AxisAngle R_rel( 0,0,1, LWA4_FT_ANGLE );
+    /*     AxisAngle R_rel( 0,0,1, LWA4_FT_ANGLE ); */
 
-        r_ft_rel = Quat(R0) * Quat(R_rel);
-    }
+    /*     r_ft_rel = Quat(R0) * Quat(R_rel); */
+    /* } */
 
     /* // SDH */
     /* bodies_sdh[PIR_SDH_ID_CENTER] = */
@@ -220,69 +219,69 @@ void printx( const char *n, const double S[8] ) {
         );
 }
 
-void sdh_finger_duqu( const double q0, double q1, double z, double S0[8], double S1[8], double S2[8] ) {
-    new (S0)      DualQuat( YAngle(q0),
-                            Vec3(0, 0, z) );
-    new (S1)      DualQuat( YAngle(q1),
-                            Vec3( SDH_L1,0,0) );
-    new (S2)      DualQuat( Vec3( SDH_L2,0,0) );
-}
+/* void sdh_finger_duqu( const double q0, double q1, double z, double S0[8], double S1[8], double S2[8] ) { */
+/*     new (S0)      DualQuat( YAngle(q0), */
+/*                             Vec3(0, 0, z) ); */
+/*     new (S1)      DualQuat( YAngle(q1), */
+/*                             Vec3( SDH_L1,0,0) ); */
+/*     new (S2)      DualQuat( Vec3( SDH_L2,0,0) ); */
+/* } */
 
-void sdh_duqu( const double q[7], double Sr[8*12] )
-{
-    /* Fill in Sr with the relative dual quaternions */
-    new (Sr+8*PIR_SDH_CENTER)  DualQuat( Vec3(SDH_LB, 0, 0) ); // At knuckle level
-    new (Sr+8*PIR_SDH_L_AXIAL) DualQuat( XAngle(-q[PIR_SDH_AXIAL]+M_PI),
-                                         Vec3(0, -SDH_B/2, -SDH_FC) );
-    new (Sr+8*PIR_SDH_R_AXIAL) DualQuat( XAngle(q[PIR_SDH_AXIAL]+M_PI),
-                                         Vec3(0, SDH_B/2, -SDH_FC) );
+/* void sdh_duqu( const double q[7], double Sr[8*12] ) */
+/* { */
+/*     /\* Fill in Sr with the relative dual quaternions *\/ */
+/*     new (Sr+8*PIR_SDH_CENTER)  DualQuat( Vec3(SDH_LB, 0, 0) ); // At knuckle level */
+/*     new (Sr+8*PIR_SDH_L_AXIAL) DualQuat( XAngle(-q[PIR_SDH_AXIAL]+M_PI), */
+/*                                          Vec3(0, -SDH_B/2, -SDH_FC) ); */
+/*     new (Sr+8*PIR_SDH_R_AXIAL) DualQuat( XAngle(q[PIR_SDH_AXIAL]+M_PI), */
+/*                                          Vec3(0, SDH_B/2, -SDH_FC) ); */
 
-    sdh_finger_duqu( q[PIR_SDH_T0], q[PIR_SDH_T1], SDH_TC,
-                     Sr+8*PIR_SDH_T0, Sr+8*PIR_SDH_T1, Sr+8*PIR_SDH_T2 );
-    sdh_finger_duqu( q[PIR_SDH_L0], q[PIR_SDH_L1], 0,
-                     Sr+8*PIR_SDH_L0, Sr+8*PIR_SDH_L1, Sr+8*PIR_SDH_L2 );
-    sdh_finger_duqu( q[PIR_SDH_R0], q[PIR_SDH_R1], 0,
-                     Sr+8*PIR_SDH_R0, Sr+8*PIR_SDH_R1, Sr+8*PIR_SDH_R2 );
-}
+/*     sdh_finger_duqu( q[PIR_SDH_T0], q[PIR_SDH_T1], SDH_TC, */
+/*                      Sr+8*PIR_SDH_T0, Sr+8*PIR_SDH_T1, Sr+8*PIR_SDH_T2 ); */
+/*     sdh_finger_duqu( q[PIR_SDH_L0], q[PIR_SDH_L1], 0, */
+/*                      Sr+8*PIR_SDH_L0, Sr+8*PIR_SDH_L1, Sr+8*PIR_SDH_L2 ); */
+/*     sdh_finger_duqu( q[PIR_SDH_R0], q[PIR_SDH_R1], 0, */
+/*                      Sr+8*PIR_SDH_R0, Sr+8*PIR_SDH_R1, Sr+8*PIR_SDH_R2 ); */
+/* } */
 
-void sdh_fk_duqu( const double q[7], DualQuat &S0,
-                  DualQuat *St, DualQuat *Sl, DualQuat *Sr )
-{
+/* void sdh_fk_duqu( const double q[7], DualQuat &S0, */
+/*                   DualQuat *St, DualQuat *Sl, DualQuat *Sr ) */
+/* { */
 
-    /* struct aa_tf_qv Erel[PIR_SDH_ID_SIZE], Eabs[PIR_SDH_ID_SIZE]; */
-    /* QuatVec E0(S0); */
+/*     /\* struct aa_tf_qv Erel[PIR_SDH_ID_SIZE], Eabs[PIR_SDH_ID_SIZE]; *\/ */
+/*     /\* QuatVec E0(S0); *\/ */
 
-    /* rfx_bodies_calc_tf( PIR_SDH_ID_SIZE, (const rfx_body**)bodies_sdh, */
-    /*                     q, */
-    /*                     &E0, */
-    /*                     Erel, Eabs ); */
-    /* *St = DualQuat(Eabs[PIR_SDH_ID_T2]); */
-    /* *Sl = DualQuat(Eabs[PIR_SDH_ID_L2]); */
-    /* *Sr = DualQuat(Eabs[PIR_SDH_ID_R2]); */
+/*     /\* rfx_bodies_calc_tf( PIR_SDH_ID_SIZE, (const rfx_body**)bodies_sdh, *\/ */
+/*     /\*                     q, *\/ */
+/*     /\*                     &E0, *\/ */
+/*     /\*                     Erel, Eabs ); *\/ */
+/*     /\* *St = DualQuat(Eabs[PIR_SDH_ID_T2]); *\/ */
+/*     /\* *Sl = DualQuat(Eabs[PIR_SDH_ID_L2]); *\/ */
+/*     /\* *Sr = DualQuat(Eabs[PIR_SDH_ID_R2]); *\/ */
 
-    double S_re[8*12] = {0};
-    sdh_duqu( q, S_re );
+/*     double S_re[8*12] = {0}; */
+/*     sdh_duqu( q, S_re ); */
 
-    DualQuat Sc = S0*DualQuat(&S_re[8*PIR_SDH_CENTER]);
-    *Sl = (Sc *
-           DualQuat(&S_re[8*PIR_SDH_L_AXIAL]) *
-           DualQuat(&S_re[8*PIR_SDH_L0]) *
-           DualQuat(&S_re[8*PIR_SDH_L1]) *
-           DualQuat(&S_re[8*PIR_SDH_L2]));
+/*     DualQuat Sc = S0*DualQuat(&S_re[8*PIR_SDH_CENTER]); */
+/*     *Sl = (Sc * */
+/*            DualQuat(&S_re[8*PIR_SDH_L_AXIAL]) * */
+/*            DualQuat(&S_re[8*PIR_SDH_L0]) * */
+/*            DualQuat(&S_re[8*PIR_SDH_L1]) * */
+/*            DualQuat(&S_re[8*PIR_SDH_L2])); */
 
-    *Sr = (Sc *
-           DualQuat(&S_re[8*PIR_SDH_R_AXIAL]) *
-           DualQuat(&S_re[8*PIR_SDH_R0]) *
-           DualQuat(&S_re[8*PIR_SDH_R1]) *
-           DualQuat(&S_re[8*PIR_SDH_R2]));
+/*     *Sr = (Sc * */
+/*            DualQuat(&S_re[8*PIR_SDH_R_AXIAL]) * */
+/*            DualQuat(&S_re[8*PIR_SDH_R0]) * */
+/*            DualQuat(&S_re[8*PIR_SDH_R1]) * */
+/*            DualQuat(&S_re[8*PIR_SDH_R2])); */
 
-    *St = (Sc *
-           DualQuat(&S_re[8*PIR_SDH_T0]) *
-           DualQuat(&S_re[8*PIR_SDH_T1]) *
-           DualQuat(&S_re[8*PIR_SDH_T2]));
+/*     *St = (Sc * */
+/*            DualQuat(&S_re[8*PIR_SDH_T0]) * */
+/*            DualQuat(&S_re[8*PIR_SDH_T1]) * */
+/*            DualQuat(&S_re[8*PIR_SDH_T2])); */
 
 
-}
+/* } */
 
 int pir_kin_arm( struct pir_state *X ) {
     if( !is_init) kin_init();
@@ -294,15 +293,15 @@ int pir_kin_arm( struct pir_state *X ) {
         lwa4_kin_duqu( &X->q[j], S0[i].data, aa_tf_duqu_ident,
                        X->S_wp[i], X->J_wp[i] );
         /*-- Hand --*/
-        // fixed TF to hand base
-        DualQuat S_w2e(XAngle(-60*M_PI/180),
-                       Vec3(LWA4_L_e + LWA4_FT_L, 0, 0));
-        DualQuat S_l2, S_r2, S_t2;
-        sdh_fk_duqu( &X->q[k], S_w2e,
-                     &S_t2, &S_l2, &S_r2 );
-        /* Find pose of point between the two fingers */
-        new( &X->S_eer[i] ) DualQuat( S_w2e.real,
-                                      (S_r2.translation() + S_l2.translation()) / 2 );
+        /* // fixed TF to hand base */
+        /* DualQuat S_w2e(XAngle(-60*M_PI/180), */
+        /*                Vec3(LWA4_L_e + LWA4_FT_L, 0, 0)); */
+        /* DualQuat S_l2, S_r2, S_t2; */
+        /* sdh_fk_duqu( &X->q[k], S_w2e, */
+        /*              &S_t2, &S_l2, &S_r2 ); */
+        /* /\* Find pose of point between the two fingers *\/ */
+        /* new( &X->S_eer[i] ) DualQuat( S_w2e.real, */
+        /*                               (S_r2.translation() + S_l2.translation()) / 2 ); */
 
 
     }
@@ -310,15 +309,16 @@ int pir_kin_arm( struct pir_state *X ) {
     return 0;
 }
 
-int pir_kin_ft( struct pir_state *X, double F_raw[2][6], double r_ft[2][4] ) {
+int pir_kin_ft( double *tf_abs, struct pir_state *X, double F_raw[2][6], double r_ft[2][4] ) {
 
     if( !is_init) kin_init();
+
+    memcpy( r_ft[PIR_LEFT], &tf_abs[ PIR_TF_LEFT_FT*7 ], 4*sizeof(double) );
+    memcpy( r_ft[PIR_RIGHT], &tf_abs[ PIR_TF_RIGHT_FT*7 ], 4*sizeof(double) );
 
     for( size_t i = 0; i < 2; i ++ ) {
         int j, k;
         PIR_SIDE_INDICES(i, j, k);
-        /*-- F/T --*/
-        aa_tf_qmul( X->S_wp[i], r_ft_rel.data, r_ft[i] );
         // rotate
         aa_tf_qrot( r_ft[i], F_raw[i],   X->F[i]);
         aa_tf_qrot( r_ft[i], F_raw[i]+3, X->F[i]+3 );

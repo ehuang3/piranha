@@ -169,7 +169,7 @@
 (defparameter *pir-arm*
   `( ,@*lwa4-frames*
     ,(reflex:make-fixed-frame "FT" "WRIST2"
-                              (aa:g* (aa:quaternion (aa::row-matrix '(0 1 0) '(0 0 1) '(1 0 0)))
+                              (aa:g* (aa:quaternion (aa::col-matrix '(0 1 0) '(0 0 1) '(1 0 0)))
                                      (aa:quaternion (aa:z-angle (* .25 pi)))))
     ,(reflex:make-fixed-frame "HAND_BASE" "WRIST2"
                               (amino:x-angle (* -60 (/ pi 180)))
@@ -188,8 +188,8 @@
                                :y "LWA4_L_0 + PIR_L_SHOULDER_WIDTH/2 - LWA4_L_P")
      ,(reflex:make-fixed-frame "RIGHT_BASE" "TORSO"
                                (aa:quaternion (aa::col-matrix '(0 -1 0)
-                                                               '(0 0 -1)
-                                                               '(1 0 0)))
+                                                              '(0 0 -1)
+                                                              '(1 0 0)))
                                :y "-(LWA4_L_0 + PIR_L_SHOULDER_WIDTH/2 - LWA4_L_P)"))
    (reflex:prefix-frames "LEFT_BASE" "LEFT_" *pir-arm*)
    (reflex:prefix-frames "RIGHT_BASE" "RIGHT_" *pir-arm*)

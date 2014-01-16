@@ -193,7 +193,7 @@ void lwa4_duqu( const double *q, double *S_rel );
 int pir_kin_solve( double q0[7], double S1[8], double q1[7] );
 
 int pir_kin_arm( struct pir_state *X );
-int pir_kin_ft( struct pir_state *X, double F_raw[2][6], double r_ft[2][4] );
+int pir_kin_ft( double *tf_abs, struct pir_state *X, double F_raw[2][6], double r_ft[2][4] );
 
 struct pir_msg {
     char mode[64];
