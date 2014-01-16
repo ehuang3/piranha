@@ -46,7 +46,7 @@ fi
 CHANNELS="ref-torso state-torso ref-left state-left ref-right state-right"
 CHANNELS="$CHANNELS sdhref-left sdhstate-left sdhref-right sdhstate-right"
 CHANNELS="$CHANNELS ft-left ft-right ft-bias-left ft-bias-right"
-CHANNELS="$CHANNELS pir-ctrl pir-state pir-complete joystick"
+CHANNELS="$CHANNELS pir-ctrl pir-state pir-complete joystick pir-config"
 
 pir_ach_mk() {
     for c in $CHANNELS; do

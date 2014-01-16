@@ -65,6 +65,7 @@ typedef struct {
     ach_channel_t chan_state_pir;
     ach_channel_t chan_sdhstate_left;
     ach_channel_t chan_sdhstate_right;
+    ach_channel_t chan_config;;
 
 
     double F_raw[2][6]; ///< raw F/T reading, left
@@ -120,6 +121,7 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_ftbias[PIR_LEFT],  "ft-bias-left",  NULL );
     sns_chan_open( &cx.chan_ftbias[PIR_RIGHT], "ft-bias-right", NULL );
     sns_chan_open( &cx.chan_state_pir,   "pir-state",  NULL );
+    sns_chan_open( &cx.chan_config,   "pir-config",  NULL );
 
     {
         ach_channel_t *chans[] = {&cx.chan_state_left, &cx.chan_state_torso, NULL};
@@ -385,6 +387,13 @@ static void update(void) {
         // send
         ach_status_t r = ach_put( &cx.chan_state_pir, &cx.state,
                                   sizeof(cx.state) );
+
+        if( ACH_OK != r ) {
+            SNS_LOG( LOG_ERR, "Couldn't put ach frame: %s\n", ach_result_to_string(r) );
+        }
+
+        r = ach_put( &cx.chan_config, &cx.Q,
+                     sizeof(cx.Q) );
 
         if( ACH_OK != r ) {
             SNS_LOG( LOG_ERR, "Couldn't put ach frame: %s\n", ach_result_to_string(r) );
