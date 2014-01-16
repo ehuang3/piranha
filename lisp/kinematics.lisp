@@ -145,14 +145,14 @@
 (defun sdh (parent prefix)
   (reflex:prefix-frames
    parent prefix
-   `(,(reflex:make-fixed-frame "BASE" nil (aa:x-angle (* 60 (/ pi 180))) :x "LWA4_L_e + LWA4_FT_L")
+   `(,(reflex:make-fixed-frame "BASE" nil (aa:x-angle (* -60 (/ pi 180))) :x "LWA4_L_e + LWA4_FT_L")
       ,(reflex:make-fixed-frame "CENTER" "BASE" (aa:x-angle 0) :x "SDH_LB")
       ,(reflex:make-fixed-frame "FINGERTIP" "BASE" (aa:x-angle 0))
       (:frame :name "L_AXIAL"
               :parent "CENTER"
               :type :revolute
               :configuration "Q_AXIAL"
-              :offset "M_PI"
+              :offset "-M_PI"
               :axis (-1 0 0)
               :translation (0 "-SDH_B/2" "-SDH_FC"))
       (:frame :name "R_AXIAL"
@@ -162,8 +162,8 @@
               :offset "M_PI"
               :axis (1 0 0)
               :translation (0 "SDH_B/2" "-SDH_FC"))
-      ,@(sdh-finger "CENTER" "T_" "SDH_TC")
       ,@(sdh-finger "L_AXIAL" "L_" 0)
+      ,@(sdh-finger "CENTER" "T_" "SDH_TC")
       ,@(sdh-finger "R_AXIAL" "R_" 0))))
 
 (defparameter *pir-arm*
@@ -205,6 +205,7 @@
                             :headers '("pir-param.h")
                             :relative-function "pir_tf_rel"
                             :absolute-function "pir_tf_abs"
+                            :normalize t
                             :parents-array "pir_tf_parents"
                             :dot-file "pir-frame.dot"
                             :headers '("pir-frame.h")))
