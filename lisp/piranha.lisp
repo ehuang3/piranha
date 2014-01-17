@@ -45,6 +45,7 @@
 
 (defvar *ctrl-channel* nil)
 (defvar *state-channel* nil)
+(defvar *config-channel* nil)
 (defvar *complete-channel* nil)
 
 (defvar *message-seq-no* 0)
@@ -71,6 +72,7 @@
 (defun pir-start ()
   (assert (null *ctrl-channel*))
   (setq *ctrl-channel* (ach::open-channel "pir-ctrl"))
+  (setq *config-channel* (ach::open-channel "pir-config"))
   (setq *state-channel* (ach::open-channel "pir-state"))
   (setq *complete-channel* (ach::open-channel "pir-complete")))
 
@@ -146,6 +148,13 @@
       (setf (aref x i)
             (mem-aref pointer :double (+ i offset))))
     x))
+
+(defun get-config ()
+  (let ((config (make-array (* 2 2 (+ 7 7)) :element-type 'double-float)))
+    (cffi:with-pointer-to-vector-data (ptr config)
+      (let ((size (* (length config) 8)))
+        (ach::get-pointer *config-channel* ptr size :wait t :last t)))
+    config))
 
 (defun get-state ()
   (with-foreign-object (state '(:struct pir-cstate))
@@ -320,7 +329,7 @@
 
 (defun pir-rotate (side r &key (time 10d0))
   (let ((state (get-state)))
-    (pir-go side (list (make-trajx-point :pose (amino::tf-qv2duqu r
+    (pir-go side (list (make-trajx-point :pose (amino:dual-quaternion-2 r
                                                                   (aa::quaternion-translation-translation
                                                                    (ecase side
                                                                      (:left (pir-state-e-f-l state))

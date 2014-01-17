@@ -46,6 +46,8 @@
 ;;;        :configuration NAME
 ;;;        :translation (x y z))
 
+(defconstant pi/2 (* .5 pi))
+(defconstant -pi/2 (* -.5 pi))
 
 ;; Try to load Quicklisp or ASDF
 (unless (find-package :quicklisp)
@@ -136,10 +138,10 @@
      ;; finger tip
      ,(reflex:make-fixed-frame "2" "1" (aa:x-angle 0) :x "SDH_L2")
      ;; Knuckles
-     ,(reflex:make-fixed-frame "K0M" parent (aa:x-angle 0)  :y "-SDH_L0M" :z z)
-     ,(reflex:make-fixed-frame "K0P" parent (aa:x-angle 0)  :y "SDH_L0P" :z z)
-     ,(reflex:make-fixed-frame "K1M" "1" (aa:x-angle 0)  :x "SDH_L1" :y "-SDH_L0M")
-     ,(reflex:make-fixed-frame "K1P" "1" (aa:x-angle 0)  :x "SDH_L1" :y "SDH_L0P")
+     ,(reflex:make-fixed-frame "K0M" parent (aa:x-angle -pi/2)  :y "-SDH_L0M" :z z)
+     ,(reflex:make-fixed-frame "K0P" parent (aa:x-angle pi/2)  :y "SDH_L0P" :z z)
+     ,(reflex:make-fixed-frame "K1M" "1" (aa:x-angle -pi/2)  :x "SDH_L1" :y "-SDH_L0M")
+     ,(reflex:make-fixed-frame "K1P" "1" (aa:x-angle pi/2)  :x "SDH_L1" :y "SDH_L0P")
      )))
 
 (defun sdh (parent prefix)

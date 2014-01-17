@@ -43,21 +43,31 @@ else
     exit 1
 fi
 
-
+PIRANHA_HOST=calvin
+PIRANHA_VISION_HOST=baley
 
 case "$1" in
     start)
         $SNS run -d ach-pir-ctrl -- \
-            achd -r push calvin pir-ctrl
+            achd -r push $PIRANHA_HOST pir-ctrl
         $SNS run -d ach-pir-state -- \
-            achd -r pull calvin pir-state
+            achd -r pull $PIRANHA_HOST pir-state
         $SNS run -d ach-pir-complete -- \
-            achd -r pull calvin pir-complete
+            achd -r pull $PIRANHA_HOST pir-complete
+        $SNS run -d ach-pir-config -- \
+            achd -r pull $PIRANHA_HOST pir-config
+        $SNS run -d ach-pir-marker -- \
+            achd -r pull $PIRANHA_VISION_HOST pir-marker
+        $SNS run -d ach-pir-marker-filt -- \
+            achd -r pull $PIRANHA_VISION_HOST pir-marker-filt
         ;;
     stop)
         $SNS kill ach-pir-ctrl
         $SNS kill ach-pir-state
         $SNS kill ach-pir-complete
+        $SNS kill ach-pir-config
+        $SNS kill ach-pir-marker
+        $SNS kill ach-pir-marker-filt
         ;;
     *)
         echo "Invalid command"

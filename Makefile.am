@@ -40,6 +40,10 @@ pir_cal_SOURCES = src/pir-cal.c
 pir_cal_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
 
 
+bin_PROGRAMS += pir-dump
+pir_dump_SOURCES = src/pir-dump.c
+pir_dump_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
+
 BUILT_SOURCES = pir-frame.h pir-frame.c
 
 pir-frame.c: lisp/kinematics.lisp
