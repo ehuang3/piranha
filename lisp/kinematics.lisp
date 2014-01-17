@@ -207,5 +207,6 @@
                             :absolute-function "pir_tf_abs"
                             :normalize t
                             :parents-array "pir_tf_parents"
+                            :names-array "pir_tf_names"
                             :dot-file "pir-frame.dot"
                             :headers '("pir-frame.h")))
