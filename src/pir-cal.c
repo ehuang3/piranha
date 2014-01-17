@@ -198,7 +198,7 @@ int marker2frame( size_t marker_id ) {
         // TODO: find correspondences
     /*     /\* Left *\/ */
     /* case -1: return PIR_TF_LEFT_SDH_L_K0M; */
-    /* case -1: return PIR_TF_LEFT_SDH_L_K0P; */
+    //case 0: return PIR_TF_LEFT_SDH_L_K0P;
     /* case -1: return PIR_TF_LEFT_SDH_L_K1M; */
     /* case -1: return PIR_TF_LEFT_SDH_L_K1P; */
 
@@ -209,15 +209,15 @@ int marker2frame( size_t marker_id ) {
     /* case -1: return PIR_TF_LEFT_SDH_T_K1P; */
 
     /*     // R */
-    /* case -1: return PIR_TF_LEFT_SDH_T_R0M; */
-    /* case -1: return PIR_TF_LEFT_SDH_T_R0P; */
-    /* case -1: return PIR_TF_LEFT_SDH_T_R1M; */
-    /* case -1: return PIR_TF_LEFT_SDH_T_R1P; */
+    //case 1: return PIR_TF_LEFT_SDH_R_K0M;
+    /* case -1: return PIR_TF_LEFT_SDH_R_K0P; */
+    /* case -1: return PIR_TF_LEFT_SDH_R_K1M; */
+    //case 9: return PIR_TF_LEFT_SDH_R_K1P;
 
     /*     /\* Right *\/ */
     /*     // L */
     /* case -1: return PIR_TF_RIGHT_SDH_L_K0M; */
-    /* case -1: return PIR_TF_RIGHT_SDH_L_K0P; */
+    case 0: return PIR_TF_RIGHT_SDH_L_K0P;
     /* case -1: return PIR_TF_RIGHT_SDH_L_K1M; */
     /* case -1: return PIR_TF_RIGHT_SDH_L_K1P; */
 
@@ -228,10 +228,10 @@ int marker2frame( size_t marker_id ) {
     /* case -1: return PIR_TF_RIGHT_SDH_T_K1P; */
 
     /*     // R */
-    /* case -1: return PIR_TF_RIGHT_SDH_T_R0M; */
-    /* case -1: return PIR_TF_RIGHT_SDH_T_R0P; */
-    /* case -1: return PIR_TF_RIGHT_SDH_T_R1M; */
-    /* case -1: return PIR_TF_RIGHT_SDH_T_R1P; */
+    case 1: return PIR_TF_RIGHT_SDH_R_K0M;
+    /* case -1: return PIR_TF_RIGHT_SDH_R_K0P; */
+    case 9: return PIR_TF_RIGHT_SDH_R_K1M;
+    /* case -1: return PIR_TF_RIGHT_SDH_R_K1P; */
 
     default: return -1;
     }
