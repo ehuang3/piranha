@@ -44,6 +44,7 @@
 #include <sns.h>
 #include <getopt.h>
 #include <reflex.h>
+#include <signal.h>
 #include "piranha.h"
 
 #define N_MARKERS 32
@@ -68,6 +69,8 @@ int opt_samples = 1;
 int opt_run = 0;
 int opt_comp = 0;
 
+sig_atomic_t is_signaled = 0;
+
 
 static void
 run_cal( void );
@@ -75,6 +78,21 @@ run_cal( void );
 static void
 compute_cal( void );
 
+
+static void sighandler( int sig ) {
+    (void)sig;
+    is_signaled = 1;
+}
+
+
+static void sigregister( void ) {
+    struct sigaction act;
+    memset(&act, 0, sizeof(act));
+    act.sa_handler = &sighandler;
+    if( sigaction(SIGUSR1, &act, NULL) ) {
+        SNS_DIE( "Could not install signal handler\n");
+    }
+}
 
 
 int main( int argc, char **argv )
@@ -115,6 +133,7 @@ int main( int argc, char **argv )
                   "  -n samples,                 Number of samples to take"
                   "  -R,                         Run a calibration\n"
                   "  -C,                         Compute a calibration\n"
+                  "  -C,                         Compute a calibration\n"
                   "\n"
                   "Report bugs to <ntd@gatech.edu>"
                 );
@@ -150,6 +169,7 @@ static void
 run_cal( void )
 {
     sns_init();
+    sigregister();
     ach_channel_t chan_config, chan_marker;
     sns_chan_open( &chan_config, "pir-config", NULL );
     sns_chan_open( &chan_marker, "pir-marker", NULL );
@@ -166,11 +186,16 @@ run_cal( void )
     char *lineptr = NULL;
     size_t n = 0;
     for(;;) {
-        printf("> Hit ENTER to sample, `.' terminate: ");
-        if ( -1 == (getline(&lineptr, &n, stdin)) ||
-             0 == strcmp(".\n", lineptr) )
+        printf("> Hit ENTER or send SIGUSR1 to sample, `.' terminate: ");
         {
-            break;
+            ssize_t k = getline(&lineptr, &n, stdin);
+            if( is_signaled ) {
+                is_signaled = 0;
+            } else if ( -1 ==  k ||
+                        0 == strcmp(".\n", lineptr) )
+            {
+                break;
+            }
         }
         for( int i = 0; i < opt_samples; i ++ ) {
         // get marker
