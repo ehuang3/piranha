@@ -64,6 +64,7 @@
 (defun degrees (x) (/ (* x pi) 180d0))
 
 (defparameter +r-down+ (quaternion (y-angle pi/2)))
+(defparameter +r-up-in+ (quaternion (y-angle -pi/2)))
 (defparameter +r-left+ (g* (quaternion (z-angle pi/2))
                            (x-angle pi/2)))
 (defparameter +r-right+ (g* (quaternion (z-angle -pi/2))
@@ -382,6 +383,16 @@
 (defun pir-set (side q &key (time 10d0))
   ;(check-type q (simple-array double-float (7)))
   (pir-trajq side (list (make-trajq-point :q q :time time))))
+
+
+(defun pir-set-axis (side i  q &key (time 10d0) (state (get-state)))
+  (let* ((q0 (ecase side (:left
+                          (pir-state-q-l state))
+                    (:right
+                     (pir-state-q-r state))))
+         (q1 (aa::vec-copy q0)))
+    (setf (aa::vecref q1 i) q)
+    (pir-set side q1 :time time)))
 
 (defun pir-torso (q &key (time 10d0))
   (pir-message "trajq-torso" (aa::vec time q)))

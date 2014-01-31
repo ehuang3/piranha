@@ -137,9 +137,9 @@ void ctrl_sin( pirctrl_cx_t *cx ) {
 void ctrl_step( pirctrl_cx_t *cx ) {
 
     if( cx->ref.user[ GAMEPAD_AXIS_LT ] > .5 ) {
-        aa_fset(& cx->ref.dq[PIR_AXIS_L0], 15 * M_PI/180, 7 );
+        AA_MEM_SET(& cx->ref.dq[PIR_AXIS_L0], 15 * M_PI/180, 7 );
     } else if( cx->ref.user[ GAMEPAD_AXIS_RT ] > .5 ) {
-        aa_fset(& cx->ref.dq[PIR_AXIS_L0], -15 * M_PI/180, 7 );
+        AA_MEM_SET(& cx->ref.dq[PIR_AXIS_L0], -15 * M_PI/180, 7 );
     }
 
 

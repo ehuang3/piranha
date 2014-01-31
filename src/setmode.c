@@ -80,14 +80,14 @@ int set_mode_k_s2min(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 int set_mode_k_pt(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     if ( msg_ctrl->n == 1 ) {
         printf("k_pt: %f\n", msg_ctrl->x[0].f );
-        aa_fset( cx->Kx.p, msg_ctrl->x[0].f, 3 );
+        AA_MEM_SET( cx->Kx.p, msg_ctrl->x[0].f, 3 );
     }
     return 0;
 }
 int set_mode_k_pr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     if ( msg_ctrl->n == 1 ) {
         printf("k_pr: %f\n", msg_ctrl->x[0].f );
-        aa_fset( cx->Kx.p+3, msg_ctrl->x[0].f, 3 );
+        AA_MEM_SET( cx->Kx.p+3, msg_ctrl->x[0].f, 3 );
     }
     return 0;
 }
@@ -95,7 +95,7 @@ int set_mode_k_pr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 int set_mode_k_q(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     if(  msg_ctrl->n == 1 ) {
         printf("k_q: %f\n", msg_ctrl->x[0].f );
-        aa_fset( cx->Kx.q, msg_ctrl->x[0].f, 7 );
+        AA_MEM_SET( cx->Kx.q, msg_ctrl->x[0].f, 7 );
     }
     return 0;
 }
@@ -157,11 +157,13 @@ int set_mode_trajx_side(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double S0[8]
     struct rfx_trajx_point_list *plist = rfx_trajx_point_list_alloc( &cx->modereg );
 
     // initial point
-    rfx_trajx_point_list_addb_duqu( plist, 0, 1, S0 );
+    double t = 0;
+    rfx_trajx_point_list_addb_duqu( plist, t, 1, S0 );
 
     // final point
     for( size_t i = 0; i + 9 <= msg_ctrl->n; i += 9 ) {
-        double t = msg_ctrl->x[i].f;
+        double dt = msg_ctrl->x[i].f;
+        t += dt;
         double *S = &msg_ctrl->x[i+1].f;
         rfx_trajx_point_list_addb_duqu( plist, t, 1, S );
     }

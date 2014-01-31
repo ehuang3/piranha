@@ -184,7 +184,7 @@ static const double tf_ident[] = {1,0,0, 0,1,0, 0,0,1, 0,0,0};
 int main( int argc, char **argv ) {
     sns_init();
     memset(&cx, 0, sizeof(cx));
-    cx.dt = .002;
+    cx.dt = 1.0 / 250;
 
     /*-- args --*/
     for( int c; -1 != (c = getopt(argc, argv, "V?hH" SNS_OPTSTRING)); ) {
@@ -296,18 +296,18 @@ int main( int argc, char **argv ) {
 
 
     rfx_ctrl_ws_lin_k_init( &cx.Kx, 7 );
-    aa_fset( cx.Kx.q, 0.1, 7 );
+    AA_MEM_SET( cx.Kx.q, 0.1, 7 );
     cx.Kx.q[1] *= 5; // lower limits
     cx.Kx.q[3] *= 5; // lower limits
     cx.Kx.q[5] *= 5; // lower limits
     cx.Kx.q[6] *= 5; // this module is most sensitive to limits
-    //aa_fset( cx.Kx.f, .003, 3 );
-    //aa_fset( cx.Kx.f+3, .000, 3 );
-    //aa_fset( cx.Kx.f, -.000, 6 );
-    aa_fset( cx.Kx.p, 1.0, 3 );
-    aa_fset( cx.Kx.p+3, 1.0, 3 );
-    /* aa_fset( cx.K.p, 0.0, 3 ); */
-    /* aa_fset( cx.K.p+3, 0.0, 3 ); */
+    //AA_MEM_SET( cx.Kx.f, .003, 3 );
+    //AA_MEM_SET( cx.Kx.f+3, .000, 3 );
+    //AA_MEM_SET( cx.Kx.f, -.000, 6 );
+    AA_MEM_SET( cx.Kx.p, 1.0, 3 );
+    AA_MEM_SET( cx.Kx.p+3, 1.0, 3 );
+    /* AA_MEM_SET( cx.K.p, 0.0, 3 ); */
+    /* AA_MEM_SET( cx.K.p+3, 0.0, 3 ); */
     cx.Kx.dls = .005;
     cx.Kx.s2min = .01;
     printf("dls s2min: %f\n", cx.Kx.s2min);

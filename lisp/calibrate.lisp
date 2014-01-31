@@ -46,33 +46,115 @@
 (defvar *chan-marker*)
 
 
-(defcstruct marker-tf
-  (n :uint8)
-  (mask :uint64)
-  (data :double))
 
 
-(defun read-markers ()
-  (let ((buf-size (+ (foreign-type-size '(:struct marker-tf))
-                     (* 8 7 256))))
-    (with-foreign-pointer (ptr buf-size)
-      (ach:get-pointer *chan-marker* ptr buf-size :wait t :last t)
-      (let ((n (foreign-slot-value ptr '(:struct marker-tf) 'n))
-            (mask (foreign-slot-value ptr '(:struct marker-tf) 'mask))
-            (data-ptr (foreign-slot-pointer ptr '(:struct marker-tf) 'data)))
-        (values (loop for i below n
-                   collect
-                     (quaternion-translation-2 (read-doubles data-ptr 4 (* 7 i))
-                                               (read-doubles data-ptr 3 (+ 4 (* 7 i)))))
-                mask)))))
+(defparameter +cal-right-q+
+  (aa::vec 0 0 0 0 0 0 0))
+
+(defparameter +cal-right-x-min+ .45)
+(defparameter +cal-right-x-max+ .5001)
+
+(defparameter +cal-right-y-min+ -.0)
+(defparameter +cal-right-y-max+ .4001)
+
+(defparameter +cal-right-z-min+ -.02)
+(defparameter +cal-right-z-max+ .0801)
+
+(defparameter +cal-right-rot0+
+  (g* +r-left+ (x-angle (degrees 90))))
+
+(defparameter +cal-right-rot+
+  (list
+   +cal-right-rot0+
+   (aa:g* +cal-right-rot0+ (y-angle (degrees -10)))
+   (aa:g* +cal-right-rot0+ (y-angle (degrees 20)))
+   (aa:g* +cal-right-rot0+ (x-angle (degrees 20)))
+   (aa:g* +cal-right-rot0+ (x-angle (degrees -20)))
+   (aa:g* +cal-right-rot0+ (z-angle (degrees 20)))
+   (aa:g* +cal-right-rot0+ (z-angle (degrees -10)))))
 
 
-(defun register-camera ()
 
-  ;; loop
-  ;;  - move arms to some position
-  ;;  - record FK TF and camera TF
+(defun cal-go-sleep (e time side)
+  (format t "~&Going to ~A in ~As..." e time)
+  (pir-go-1 side e :time time)
+  (sleep (1+ time))
+  (format t "~&done"))
+
+(defun pir-cal-1 (tf pid &key
+                  (side :right)
+                  (time 5d0))
+  (cal-go-sleep tf time side)
+  (sb-posix:kill pid sb-posix:sigusr1)
+  (sleep 4)
+  )
 
 
-  ;; UMEYAMA
-)
+(defun cal-loop-dim (i min max dx function &optional (state (get-state)))
+  (let ((x (aa::vec3-ref (aa::quaternion-translation-translation (pir-state-e-f-r state))
+                         i)))
+    (if (< (abs (- x min))
+           (abs (- x max)))
+        (loop for x = min then (+ x dx)
+           while (<= x max)
+           do (funcall function x))
+        (loop for x = max then (- x dx)
+           while (>= x min)
+           do (funcall function x)))))
+
+(defun pir-cal (pid &key
+                (dx 5e-2)
+                (dy 10e-2)
+                (dz 10e-2)
+                (side :right))
+
+  (dolist (r +cal-right-rot+)
+    ;; go to initial pose
+    (cal-loop-dim
+     0 +cal-right-x-min+ +cal-right-x-max+ dx
+     (lambda (x)
+       (cal-loop-dim
+        1 +cal-right-y-min+ +cal-right-y-max+ dy
+        (lambda (y)
+          (cal-loop-dim
+           2 +cal-right-z-min+ +cal-right-z-max+ dz
+           (lambda (z)
+             (pir-cal-1 (quaternion-translation-2 r
+                                                  (aa::vec3 x y z))
+                        pid :side side)))))))))
+
+
+    ;; (cal-go-sleep (aa:quaternion-translation-2 r (aa::vec3 +cal-right-x-min+
+    ;;                                                        +cal-right-y-min+
+    ;;                                                        +cal-right-z-min+))
+    ;;               20d0 side)
+    ;; ;; loop through translations
+    ;; (loop for x = +cal-right-x-min+ then (+ x dx)
+    ;;    while (< x +cal-right-x-max+)
+    ;;    do (loop for y = +cal-right-y-min+ then (+ y dx)
+    ;;          while (< y +cal-right-y-max+)
+    ;;          do (loop for z = +cal-right-z-min+ then (+ z dx)
+    ;;                while (< z +cal-right-z-max+)
+    ;;                do (pir-cal-1 (quaternion-translation-2 r
+    ;;                                                        (aa::vec3 x y z))
+    ;;                              pid :side side))))))
+;; (defun pir-cal (pid &key
+;;                 (dx 5e-2)
+;;                 (side :right))
+
+;;   (dolist (r +cal-right-rot+)
+;;     ;; go to initial pose
+;;     (cal-go-sleep (aa:quaternion-translation-2 r (aa::vec3 +cal-right-x-min+
+;;                                                            +cal-right-y-min+
+;;                                                            +cal-right-z-min+))
+;;                   20d0 side)
+;;     ;; loop through translations
+;;     (loop for x = +cal-right-x-min+ then (+ x dx)
+;;        while (< x +cal-right-x-max+)
+;;        do (loop for y = +cal-right-y-min+ then (+ y dx)
+;;              while (< y +cal-right-y-max+)
+;;              do (loop for z = +cal-right-z-min+ then (+ z dx)
+;;                    while (< z +cal-right-z-max+)
+;;                    do (pir-cal-1 (quaternion-translation-2 r
+;;                                                            (aa::vec3 x y z))
+;;                                  pid :side side))))))

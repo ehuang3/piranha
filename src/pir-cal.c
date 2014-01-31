@@ -46,6 +46,8 @@
 #include <reflex.h>
 #include <signal.h>
 #include "piranha.h"
+#include <sys/types.h>
+#include <unistd.h>
 
 #define N_MARKERS 32
 
@@ -183,20 +185,15 @@ run_cal( void )
     printf("COLLECTING CALIBRATION DATA\n"
            "===========================\n" );
 
-    char *lineptr = NULL;
-    size_t n = 0;
-    for(;;) {
-        printf("> Hit ENTER or send SIGUSR1 to sample, `.' terminate: ");
-        {
-            ssize_t k = getline(&lineptr, &n, stdin);
-            if( is_signaled ) {
-                is_signaled = 0;
-            } else if ( -1 ==  k ||
-                        0 == strcmp(".\n", lineptr) )
-            {
-                break;
-            }
-        }
+    //char *lineptr = NULL;
+    //size_t n = 0;
+    pid_t my_pid = getpid();
+    while(!sns_cx.shutdown) {
+        printf("> Send SIGUSR1 to %d to sample\n", my_pid);
+        pause();
+        if( is_signaled ) {
+            is_signaled = 0;
+        } else continue;
         for( int i = 0; i < opt_samples; i ++ ) {
         // get marker
         {
@@ -238,6 +235,7 @@ run_cal( void )
         // write data
         aa_mem_region_local_release();
     }
+    printf("Terminating.\n");
     fclose(f_q);
     fclose(f_m);
 }
