@@ -59,5 +59,9 @@ kinematics.f: $(top_srcdir)/src/kinematics.mac
 	maxima --very-quiet -b $(top_srcdir)/src/kinematics.mac
 
 
+noinst_PROGRAMS += iros2014
+iros2014_SOURCES = src/experiments/iros2014.c
+iros2014_LDADD = libpiranha.la -lreflex -lamino -llapack -lblas
+
 clean-local:
 	rm -f pir-frame.h pir-frame.c pir-frame.dot
