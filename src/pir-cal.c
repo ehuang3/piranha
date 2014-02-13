@@ -64,6 +64,10 @@ const char *opt_file_marker = NULL;
 
 const char *opt_file_cam = NULL;
 const char *opt_file_fk = NULL;
+const char *opt_file_id = NULL;
+
+const char *opt_chan_take = "pir-cal-take";
+const char *opt_chan_done = "pir-cal-done";
 
 double opt_wt_thresh = 1;
 int opt_samples = 1;
@@ -81,26 +85,26 @@ static void
 compute_cal( void );
 
 
-static void sighandler( int sig ) {
-    (void)sig;
-    is_signaled = 1;
-}
+/* static void sighandler( int sig ) { */
+/*     (void)sig; */
+/*     is_signaled = 1; */
+/* } */
 
 
-static void sigregister( void ) {
-    struct sigaction act;
-    memset(&act, 0, sizeof(act));
-    act.sa_handler = &sighandler;
-    if( sigaction(SIGUSR1, &act, NULL) ) {
-        SNS_DIE( "Could not install signal handler\n");
-    }
-}
+/* static void sigregister( void ) { */
+/*     struct sigaction act; */
+/*     memset(&act, 0, sizeof(act)); */
+/*     act.sa_handler = &sighandler; */
+/*     if( sigaction(SIGUSR1, &act, NULL) ) { */
+/*         SNS_DIE( "Could not install signal handler\n"); */
+/*     } */
+/* } */
 
 
 int main( int argc, char **argv )
 {
     /* Parse */
-    for( int c; -1 != (c = getopt(argc, argv, "q:m:RCc:k:n:")); ) {
+    for( int c; -1 != (c = getopt(argc, argv, "q:m:RCc:k:i:n:")); ) {
         switch(c) {
         case 'q':
             opt_file_config = optarg;
@@ -113,6 +117,9 @@ int main( int argc, char **argv )
             break;
         case 'k':
             opt_file_fk = optarg;
+            break;
+        case 'i':
+            opt_file_id = optarg;
             break;
         case 'R':
             opt_run = 1;
@@ -132,6 +139,7 @@ int main( int argc, char **argv )
                   "  -m MARKER-FILE,             Marker file\n"
                   "  -c CAM-FILE,                Marker Pose file\n"
                   "  -k FK-FILE,                 FK Pose file\n"
+                  "  -i ID-FILE,                 Frame id file\n"
                   "  -n samples,                 Number of samples to take"
                   "  -R,                         Run a calibration\n"
                   "  -C,                         Compute a calibration\n"
@@ -171,10 +179,18 @@ static void
 run_cal( void )
 {
     sns_init();
-    sigregister();
-    ach_channel_t chan_config, chan_marker;
+    //sigregister();
+    ach_channel_t chan_config, chan_marker, chan_take, chan_done;
     sns_chan_open( &chan_config, "pir-config", NULL );
     sns_chan_open( &chan_marker, "pir-marker", NULL );
+    sns_chan_open( &chan_take, "pir-cal-take", NULL );
+    sns_chan_open( &chan_done, "pir-cal-done", NULL );
+
+    {
+        ach_channel_t *chans[] = {&chan_take, NULL};
+        sns_sigcancel( chans, sns_sig_term_default );
+    }
+
 
     FILE *f_q = fopen( opt_file_config, "w" );
     SNS_REQUIRE( NULL != f_q, "Error opening %s\n", opt_file_config );
@@ -187,13 +203,27 @@ run_cal( void )
 
     //char *lineptr = NULL;
     //size_t n = 0;
-    pid_t my_pid = getpid();
+    //pid_t my_pid = getpid();
     while(!sns_cx.shutdown) {
-        printf("> Send SIGUSR1 to %d to sample\n", my_pid);
-        pause();
-        if( is_signaled ) {
-            is_signaled = 0;
-        } else continue;
+        printf("> Send message sample\n");
+
+        void *take_buf;
+        size_t take_frame_size;
+        {
+            enum ach_status r = sns_msg_local_get( &chan_take, &take_buf, &take_frame_size,
+                                                   NULL,
+                                                   ACH_O_WAIT | ACH_O_LAST );
+            switch(r) {
+            case ACH_OK:
+            case ACH_MISSED_FRAME:
+            case ACH_CANCELED:
+                break;
+            default:
+                SNS_DIE("Ach error: `%s'\n", ach_result_to_string(r));
+            }
+        }
+
+        if( sns_cx.shutdown ) break;
         for( int i = 0; i < opt_samples; i ++ ) {
         // get marker
         {
@@ -230,6 +260,11 @@ run_cal( void )
             // get marker
         }
         printf("  sample %d: got config\n", i);
+        }
+        // send done
+        {
+            enum ach_status r = ach_put( &chan_done, take_buf, take_frame_size );
+            SNS_REQUIRE( ACH_OK == r, "Error putting done message: `%s'\n", ach_result_to_string(r) );
         }
 
         // write data
@@ -312,6 +347,7 @@ compute_cal( void )
 
     FILE *f_c = open_out( opt_file_cam );
     FILE *f_k = open_out( opt_file_fk );
+    FILE *f_i = open_out( opt_file_id );
 
     double *Q, *M;
     size_t lines;
@@ -340,7 +376,7 @@ compute_cal( void )
     int output = 0;
     for( size_t i = 0; i < lines; i ++ )
     {
-        printf("Line %lu:\n", i+1 );
+        //printf("Line %lu:\n", i+1 );
         double *q = &Q[i*PIR_TF_CONFIG_MAX];
         sns_wt_tf *wt_tf = (sns_wt_tf*) AA_MATCOL(M,marker_elts,i);
 
@@ -351,13 +387,18 @@ compute_cal( void )
 
         for( size_t j = 0; j < N_MARKERS; j ++ ) {
             ssize_t frame = marker2frame(j);
-            if( frame > 0 && wt_tf[j].weight >= opt_wt_thresh ) {
+            double norm = aa_tf_qnorm( wt_tf[j].tf.r.data );
+            if( frame > 0 &&
+                wt_tf[j].weight >= opt_wt_thresh &&
+                aa_feq( norm, 1, 1e-3 ))
+            {
                 output++;
-                printf("\t%s / marker %ld\n", pir_tf_names[frame], j );
+                //printf("\t%s / marker %ld\n", pir_tf_names[frame], j );
                 fprintf(f_c, "# %d: (marker) %s / marker %ld\n", output, pir_tf_names[frame], j );
                 aa_dump_vec( f_c, wt_tf[j].tf.data, 7);
                 fprintf(f_k, "# %d: (fk) %s / marker %ld\n", output, pir_tf_names[frame], j );
                 aa_dump_vec( f_k, &tf_abs[7*frame], 7);
+                fprintf(f_i,"%ld\n", frame);
             }
         }
         aa_mem_region_local_pop(tf_rel);
@@ -365,6 +406,10 @@ compute_cal( void )
 
     SNS_REQUIRE( feof(f_q) && feof(f_m),
                  "Error reading marker and config files\n" );
+
+    fclose(f_c);
+    fclose(f_k);
+    fclose(f_i);
 }
 
 

@@ -43,8 +43,12 @@
 
 (defvar *tf-camera*)
 
-(defvar *chan-marker*)
+(defvar *chan-take*)
+(defvar *chan-done*)
 
+(defun cal-open-channels ()
+  (setq *chan-take* (ach:open-channel "pir-cal-take")
+        *chan-done* (ach:open-channel "pir-cal-done")))
 
 
 
@@ -81,12 +85,20 @@
   (sleep (1+ time))
   (format t "~&done"))
 
-(defun pir-cal-1 (tf pid &key
+(defun cal-take ()
+  (ach:flush-channel *chan-done*)
+  (let ((val (random #xffffffff)))
+    (cffi:with-foreign-object (p :int64)
+      (setf (cffi:mem-ref p :int64) val)
+      (ach:put-pointer *chan-take* p 8)
+      (ach:get-pointer *chan-done* p 8 :wait t)
+      (assert (= val (cffi:mem-ref p :int64))))))
+
+(defun pir-cal-1 (tf &key
                   (side :right)
                   (time 5d0))
   (cal-go-sleep tf time side)
-  (sb-posix:kill pid sb-posix:sigusr1)
-  (sleep 4)
+  (cal-take)
   )
 
 
@@ -102,7 +114,7 @@
            while (>= x min)
            do (funcall function x)))))
 
-(defun pir-cal (pid &key
+(defun pir-cal (&key
                 (dx 5e-2)
                 (dy 10e-2)
                 (dz 10e-2)
@@ -121,7 +133,7 @@
            (lambda (z)
              (pir-cal-1 (quaternion-translation-2 r
                                                   (aa::vec3 x y z))
-                        pid :side side)))))))))
+                        :side side)))))))))
 
 
     ;; (cal-go-sleep (aa:quaternion-translation-2 r (aa::vec3 +cal-right-x-min+
