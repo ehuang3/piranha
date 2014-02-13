@@ -49,7 +49,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define N_MARKERS 32
+#define N_MARKERS 64
 
 //const char *opt_file_cam = NULL;
 //const char *opt_file_fk = NULL;
@@ -65,7 +65,7 @@ const char *opt_file_marker = NULL;
 const char *opt_file_cam = NULL;
 const char *opt_file_fk = NULL;
 
-double opt_wt_thresh = 0;
+double opt_wt_thresh = 1;
 int opt_samples = 1;
 
 int opt_run = 0;
@@ -248,6 +248,16 @@ struct marker_pair {
 
 int marker2frame( size_t marker_id ) {
     switch(marker_id) {
+    /* case 5:  return PIR_TF_RIGHT_SDH_L_K0M; */
+    /* case 7:  return PIR_TF_RIGHT_SDH_L_K1M; */
+    /* case 8:  return PIR_TF_RIGHT_SDH_R_K0P; */
+    /* case 2:  return PIR_TF_RIGHT_SDH_R_K1P; */
+
+    case 32+5:  return PIR_TF_RIGHT_SDH_L_K0M;
+    case 32+7:  return PIR_TF_RIGHT_SDH_L_K1M;
+    case 32+8:  return PIR_TF_RIGHT_SDH_R_K0P;
+    case 32+2:  return PIR_TF_RIGHT_SDH_R_K1P;
+
         // TODO: find correspondences
     /*     /\* Left *\/ */
     /* case -1: return PIR_TF_LEFT_SDH_L_K0M; */
@@ -270,7 +280,7 @@ int marker2frame( size_t marker_id ) {
     /*     /\* Right *\/ */
     /*     // L */
     /* case -1: return PIR_TF_RIGHT_SDH_L_K0M; */
-    case 0: return PIR_TF_RIGHT_SDH_L_K0P;
+    /* case 0: return PIR_TF_RIGHT_SDH_L_K0P; */
     /* case -1: return PIR_TF_RIGHT_SDH_L_K1M; */
     /* case -1: return PIR_TF_RIGHT_SDH_L_K1P; */
 
@@ -281,9 +291,9 @@ int marker2frame( size_t marker_id ) {
     /* case -1: return PIR_TF_RIGHT_SDH_T_K1P; */
 
     /*     // R */
-    case 1: return PIR_TF_RIGHT_SDH_R_K0M;
+    /* case 1: return PIR_TF_RIGHT_SDH_R_K0M; */
     /* case -1: return PIR_TF_RIGHT_SDH_R_K0P; */
-    case 9: return PIR_TF_RIGHT_SDH_R_K1M;
+    /* case 9: return PIR_TF_RIGHT_SDH_R_K1M; */
     /* case -1: return PIR_TF_RIGHT_SDH_R_K1P; */
 
     default: return -1;
@@ -332,7 +342,7 @@ compute_cal( void )
     {
         printf("Line %lu:\n", i+1 );
         double *q = &Q[i*PIR_TF_CONFIG_MAX];
-        sns_wt_tf *wt_tf = (sns_wt_tf*) &M[i*marker_elts];
+        sns_wt_tf *wt_tf = (sns_wt_tf*) AA_MATCOL(M,marker_elts,i);
 
         double *tf_rel = (double*)aa_mem_region_local_alloc( 7 * PIR_TF_FRAME_MAX * sizeof(tf_rel[0]) );
         double *tf_abs = (double*)aa_mem_region_local_alloc( 7 * PIR_TF_FRAME_MAX * sizeof(tf_abs[0]) );
@@ -341,7 +351,7 @@ compute_cal( void )
 
         for( size_t j = 0; j < N_MARKERS; j ++ ) {
             ssize_t frame = marker2frame(j);
-            if( frame > 0 && wt_tf[j].weight > opt_wt_thresh ) {
+            if( frame > 0 && wt_tf[j].weight >= opt_wt_thresh ) {
                 output++;
                 printf("\t%s / marker %ld\n", pir_tf_names[frame], j );
                 fprintf(f_c, "# %d: (marker) %s / marker %ld\n", output, pir_tf_names[frame], j );
@@ -350,7 +360,7 @@ compute_cal( void )
                 aa_dump_vec( f_k, &tf_abs[7*frame], 7);
             }
         }
-
+        aa_mem_region_local_pop(tf_rel);
     }
 
     SNS_REQUIRE( feof(f_q) && feof(f_m),

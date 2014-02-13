@@ -138,10 +138,10 @@
      ;; finger tip
      ,(reflex:make-fixed-frame "2" "1" (aa:x-angle 0) :x "SDH_L2")
      ;; Knuckles
-     ,(reflex:make-fixed-frame "K0M" parent (aa:x-angle -pi/2)  :y "-SDH_L0M" :z z)
-     ,(reflex:make-fixed-frame "K0P" parent (aa:x-angle pi/2)  :y "SDH_L0P" :z z)
-     ,(reflex:make-fixed-frame "K1M" "0" (aa:x-angle -pi/2)  :x "SDH_L1" :y "-SDH_L1M")
-     ,(reflex:make-fixed-frame "K1P" "0" (aa:x-angle pi/2)  :x "SDH_L1" :y "SDH_L1P")
+     ,(reflex:make-fixed-frame "K0M" parent (aa:x-angle pi/2)  :y "-SDH_L0M" :z z)
+     ,(reflex:make-fixed-frame "K0P" parent (aa:x-angle -pi/2)  :y "SDH_L0P" :z z)
+     ,(reflex:make-fixed-frame "K1M" "0" (aa:x-angle pi/2)  :x "SDH_L1" :y "-SDH_L1M")
+     ,(reflex:make-fixed-frame "K1P" "0" (aa:x-angle -pi/2)  :x "SDH_L1" :y "SDH_L1P")
      )))
 
 (defun sdh (parent prefix)
@@ -208,6 +208,7 @@
                             :relative-function "pir_tf_rel"
                             :absolute-function "pir_tf_abs"
                             :normalize t
+                            :axes-array "pir_tf_axes"
                             :parents-array "pir_tf_parents"
                             :names-array "pir_tf_names"
                             :dot-file "pir-frame.dot"
