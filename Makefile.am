@@ -9,7 +9,7 @@ pirdump_SOURCES = src/pirdump.c
 pirdump_LDADD = -lsns -lach  -lreflex -lamino -lblas -llapack
 
 pirctrl_SOURCES = src/pirctrl.c src/setmode.c src/sdh.c src/ctrl.c
-pirctrl_LDADD = -lsns -lach  -lreflex -lamino -lblas -llapack
+pirctrl_LDADD = libpiranha.la -lsns -lach -lreflex -lamino -llapack -lblas
 
 lib_LTLIBRARIES = libpiranha.la
 

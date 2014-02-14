@@ -317,28 +317,10 @@ static void update(void) {
         AA_MEM_CPY( &cx.Q.q[PIR_TF_LEFT_SDH_Q_AXIAL], &cx.state.q[PIR_AXIS_SDH_L0], 7 );
         AA_MEM_CPY( &cx.Q.q[PIR_TF_RIGHT_SDH_Q_AXIAL], &cx.state.q[PIR_AXIS_SDH_R0], 7 );
 
-        // Update Relative Transforms
-        double *tf_rel = (double*)aa_mem_region_local_alloc( 7 * PIR_TF_FRAME_MAX * sizeof(tf_rel[0]) );
-        pir_tf_rel( cx.Q.q, tf_rel );
+        // Update Transforms
+        double *tf_rel, *tf_abs;
+        pir_kin( cx.Q.q, &tf_rel, &tf_abs );
 
-        // Compute absolute TFs
-        double *tf_abs = (double*)aa_mem_region_local_alloc( 7 * PIR_TF_FRAME_MAX * sizeof(tf_abs[0]) );
-        pir_tf_abs( tf_rel, tf_abs );
-
-        // Hack in fingertips
-        {
-            double *v_ll = &tf_abs[7*PIR_TF_LEFT_SDH_L_2 + 4];
-            double *v_lr = &tf_abs[7*PIR_TF_LEFT_SDH_R_2 + 4];
-
-            double *v_rl = &tf_abs[7*PIR_TF_RIGHT_SDH_L_2 + 4];
-            double *v_rr = &tf_abs[7*PIR_TF_RIGHT_SDH_R_2 + 4];
-
-
-            for( size_t i = 0; i < 3; i ++ ) {
-                tf_abs[7*PIR_TF_LEFT_SDH_FINGERTIP  + 4 + i ] = (v_ll[i] + v_lr[i]) / 2;
-                tf_abs[7*PIR_TF_RIGHT_SDH_FINGERTIP + 4 + i ] = (v_rl[i] + v_rr[i]) / 2;
-            }
-        }
         // copy relative E.E. pose
 
         {

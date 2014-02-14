@@ -162,8 +162,7 @@ enum pir_axis {
         } else { assert(0); }                   \
     }
 
-// TODO: all transforms, jacobians, forces, in global frame
-
+// TODO: rationalize pir_config and pir_state
 struct pir_config {
     double q[PIR_TF_CONFIG_MAX];
     double dq[PIR_TF_CONFIG_MAX];
@@ -195,6 +194,9 @@ int pir_kin_solve( double q0[7], double S1[8], double q1[7] );
 int pir_kin_arm( struct pir_state *X );
 int pir_kin_ft( double *tf_abs, struct pir_state *X, double F_raw[2][6], double r_ft[2][4] );
 
+void pir_kin( const double *q, double **tf_rel, double **tf_abs );
+
+
 struct pir_msg {
     char mode[64];
     uint64_t salt;
@@ -223,6 +225,8 @@ typedef struct {
     ach_channel_t chan_state_pir;
     ach_channel_t chan_ctrl;
     ach_channel_t chan_complete;
+    ach_channel_t chan_config;
+    ach_channel_t chan_reg;
 
     ach_channel_t chan_sdhref_left;
     ach_channel_t chan_sdhref_right;
@@ -239,7 +243,13 @@ typedef struct {
         uint64_t user_button;
     } ref;
 
+    struct pir_config config;
+    double *tf_rel;
+    double *tf_abs;
+    double bEc[7];
+
     struct pir_mode_desc *mode;
+    void *mode_cx;
     struct timespec t0;
     aa_mem_region_t modereg;
     struct rfx_trajx_seg_list *trajx_segs;
@@ -321,6 +331,13 @@ void ctrl_trajq_left( pirctrl_cx_t *cx );
 void ctrl_trajq_right( pirctrl_cx_t *cx );
 void ctrl_trajq_lr( pirctrl_cx_t *cx );
 void ctrl_trajq_torso( pirctrl_cx_t *cx );
+
+struct servo_cam_cx {
+    double cEo[7];
+    double bEe[7];
+};
+int set_mode_servo_cam(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void ctrl_servo_cam( pirctrl_cx_t *cx );
 
 
 int sdh_pinch_left( pirctrl_cx_t *cx, struct pir_msg * );

@@ -41,3 +41,6 @@
 /pir-frame.dot
 /pir-frame.pdf
 /pir-tf.dot
+/pir-cal
+/pir-dump
+/pir-kalman

@@ -62,6 +62,42 @@ void ctrl_zero( pirctrl_cx_t *cx ) {
 }
 
 
+static void servo_cam( pirctrl_cx_t *cx, struct servo_cam_cx *mode_cx )
+{
+    printf("--\n");
+    double wEe[7];
+    aa_tf_qutr_cmul( AA_MATCOL(cx->tf_abs, 7, PIR_TF_RIGHT_WRIST2),
+                     AA_MATCOL(cx->tf_abs, 7, PIR_TF_RIGHT_SDH_FINGERTIP),
+                     wEe );
+    rfx_ctrl_ws_t *G = &cx->G[PIR_RIGHT];
+
+    // finger ref in body frame
+    double bEer[7];
+    aa_tf_qutr_mul( cx->bEc, mode_cx->cEo, bEer );
+    AA_MEM_CPY( bEer, mode_cx->bEe, 4 );
+    printf("bEe: "); aa_dump_vec(stdout,bEer,7);
+
+    // wrist ref
+    double bEwr[7];
+    aa_tf_qutr_mulc( bEer, wEe, bEwr );
+
+    // fill controller
+    aa_tf_qutr2duqu( bEwr, G->ref.S );
+    AA_MEM_ZERO( G->ref.dx, 6 );
+
+    int r = rfx_ctrl_ws_lin_vfwd( G, &cx->Kx, &cx->ref.dq[PIR_AXIS_R0] );
+    if( RFX_OK != r ) {
+        SNS_LOG( LOG_ERR, "ws error: %s\n",
+                 rfx_status_string((rfx_status_t)r) );
+    }
+    printf("--\n");
+}
+
+void ctrl_servo_cam( pirctrl_cx_t *cx )
+{
+    servo_cam(cx, (struct servo_cam_cx*)cx->mode_cx);
+}
+
 void ctrl_ws( pirctrl_cx_t *cx, size_t i, double S[8], double S_rel[8], int side ) {
     rfx_ctrl_ws_t *G = &cx->G[side];
     // set refs

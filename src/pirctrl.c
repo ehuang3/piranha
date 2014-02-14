@@ -58,9 +58,6 @@
 pirctrl_cx_t cx;
 
 
-
-
-
 #define VALID_NS (1000000000 / 5)
 
 static void set_mode(void);
@@ -148,6 +145,10 @@ struct pir_mode_desc mode_desc[] = {
      set_mode_trajq_torso,
      ctrl_trajq_torso,
      NULL},
+    {"servo-cam",
+     set_mode_servo_cam,
+     ctrl_servo_cam,
+     NULL},
     {"sdh-set-left",
      sdh_set_left,
      NULL,
@@ -206,6 +207,8 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_sdhref_left,  "sdhref-left",  NULL );
     sns_chan_open( &cx.chan_sdhref_right, "sdhref-right", NULL );
     sns_chan_open( &cx.chan_state_pir,    "pir-state",    NULL );
+    sns_chan_open( &cx.chan_config,       "pir-config",    NULL );
+    sns_chan_open( &cx.chan_reg,          "pir-reg",    NULL );
     sns_chan_open( &cx.chan_complete,     "pir-complete",    NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_pir, &cx.chan_js, NULL};
@@ -354,6 +357,25 @@ int main( int argc, char **argv ) {
 }
 
 static void update(void) {
+    // config
+    {
+        size_t frame_size;
+        ach_status_t r = ach_get( &cx.chan_config, &cx.config, sizeof(cx.config), &frame_size,
+                                  NULL, ACH_O_LAST );
+        switch(r) {
+        case ACH_OK:
+        case ACH_MISSED_FRAME:
+            SNS_REQUIRE( frame_size == sizeof(cx.config), "Invalid config size: %lu\n", frame_size );
+            pir_kin( cx.config.q, &cx.tf_rel, &cx.tf_abs );
+            break;
+        case ACH_CANCELED:
+        case ACH_TIMEOUT:
+        case ACH_STALE_FRAMES:
+            break;
+        default:
+            SNS_LOG(LOG_ERR, "Failed to get config: %s\n", ach_result_to_string(r) );
+        }
+    }
 
     // state
     {
@@ -363,6 +385,33 @@ static void update(void) {
         switch(r) {
         case ACH_OK:
         case ACH_MISSED_FRAME:
+        case ACH_CANCELED:
+        case ACH_TIMEOUT:
+        case ACH_STALE_FRAMES:
+            break;
+        default:
+            SNS_LOG(LOG_ERR, "Failed to get frame: %s\n", ach_result_to_string(r) );
+        }
+    }
+
+    // registration
+    {
+        size_t frame_size;
+        struct sns_msg_tf *msg;
+        enum ach_status r = sns_msg_tf_local_get( &cx.chan_reg, &msg, &frame_size, NULL, ACH_O_LAST );
+        switch(r) {
+        case ACH_OK:
+        case ACH_MISSED_FRAME:
+            if( 0 == sns_msg_tf_check_size(msg,frame_size) ) {
+                if( 2 == msg->header.n ) {
+                    AA_MEM_CPY( cx.bEc, msg->tf[1].data, 7 );
+                } else {
+                    SNS_LOG(LOG_ERR, "Unexpected registration count\n");
+                }
+            } else {
+                SNS_LOG(LOG_ERR, "Invalid registration size\n");
+            }
+            break;
         case ACH_CANCELED:
         case ACH_TIMEOUT:
         case ACH_STALE_FRAMES:

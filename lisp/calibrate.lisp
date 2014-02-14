@@ -45,11 +45,16 @@
 
 (defvar *chan-take*)
 (defvar *chan-done*)
+(defvar *chan-reg*)
 
 (defun cal-open-channels ()
   (setq *chan-take* (ach:open-channel "pir-cal-take")
-        *chan-done* (ach:open-channel "pir-cal-done")))
+        *chan-done* (ach:open-channel "pir-cal-done")
+        *chan-reg* (ach:open-channel "pir-reg")))
 
+
+;; (defun get-reg ()
+;;   (cffi:with-foreign-object (buf
 
 
 (defparameter +cal-right-q+
@@ -82,7 +87,7 @@
 (defun cal-go-sleep (e time side)
   (format t "~&Going to ~A in ~As..." e time)
   (pir-go-1 side e :time time)
-  (sleep (1+ time))
+  (pir-wait-stop :time time)
   (format t "~&done"))
 
 (defun cal-take ()
@@ -96,10 +101,9 @@
 
 (defun pir-cal-1 (tf &key
                   (side :right)
-                  (time 5d0))
+                  (time 4d0))
   (cal-go-sleep tf time side)
-  (cal-take)
-  )
+  (cal-take))
 
 
 (defun cal-loop-dim (i min max dx function &optional (state (get-state)))

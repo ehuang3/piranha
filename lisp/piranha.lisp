@@ -67,8 +67,11 @@
 (defparameter +r-up-in+ (quaternion (y-angle -pi/2)))
 (defparameter +r-left+ (g* (quaternion (z-angle pi/2))
                            (x-angle pi/2)))
+(defparameter +r-left-in+ (g* +r-left+ (x-angle pi)))
+
 (defparameter +r-right+ (g* (quaternion (z-angle -pi/2))
                             (x-angle -pi/2)))
+(defparameter +r-right-in+ (g* +r-right+ (x-angle pi)))
 
 (defun pir-start ()
   (assert (null *ctrl-channel*))
@@ -212,6 +215,16 @@
     (print-e "left-finger" (pir-state-e-f-l state))
     (print-e "right-finger" (pir-state-e-f-r state)))
   )
+
+
+(defun pir-wait-stop (&key (epsilon-dq 4d-3) (time 1d0) (dtime 1d-1))
+  (sleep time)
+  (loop
+     for state = (get-state)
+     for dq = (pir-state-dq state)
+     for dq-norm = (sqrt (aa::dot-product dq dq))
+     while (> dq-norm epsilon-dq)
+     do (sleep dtime)))
 
 
 (defun pir-set-mode (msg mode)
@@ -522,3 +535,9 @@
                                        :time t0)
                      (make-trajx-point :pose (pose-hover s z1)
                                        :time t1))))
+
+
+(defun pir-servo-cam (e-obj e-e)
+  (pir-message "servo-cam"
+               (aa::veccat (aa::vec-array e-obj)
+                           (aa::vec-array e-e))))

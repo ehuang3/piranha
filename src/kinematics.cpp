@@ -242,3 +242,28 @@ int pir_kin_ft( double *tf_abs, struct pir_state *X, double F_raw[2][6], double 
         X->F[i][2] = X->F[i][2] - PIR_FT_WEIGHT - SDH_WEIGHT;
     }
 }
+
+void pir_kin( const double *q, double **tf_rel, double **tf_abs )
+{
+    // Update Relative Transforms
+    *tf_rel = AA_MEM_REGION_LOCAL_NEW_N(double, 7*PIR_TF_FRAME_MAX);
+    *tf_abs = AA_MEM_REGION_LOCAL_NEW_N(double, 7*PIR_TF_FRAME_MAX);
+
+    pir_tf_rel( q, *tf_rel );
+    pir_tf_abs( *tf_rel, *tf_abs );
+
+    // Hack in fingertips
+    {
+        double *v_ll = &(*tf_abs)[7*PIR_TF_LEFT_SDH_L_2 + 4];
+        double *v_lr = &(*tf_abs)[7*PIR_TF_LEFT_SDH_R_2 + 4];
+
+        double *v_rl = &(*tf_abs)[7*PIR_TF_RIGHT_SDH_L_2 + 4];
+        double *v_rr = &(*tf_abs)[7*PIR_TF_RIGHT_SDH_R_2 + 4];
+
+
+        for( size_t i = 0; i < 3; i ++ ) {
+            (*tf_abs)[7*PIR_TF_LEFT_SDH_FINGERTIP  + 4 + i ] = (v_ll[i] + v_lr[i]) / 2;
+            (*tf_abs)[7*PIR_TF_RIGHT_SDH_FINGERTIP + 4 + i ] = (v_rl[i] + v_rr[i]) / 2;
+        }
+    }
+}
