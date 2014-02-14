@@ -54,6 +54,11 @@
 
 double opt_wt_thresh = 1;
 
+#define MK0 (32+5)
+#define MK1 (32+7)
+#define MK2 (32+8)
+#define MK3 (32+2)
+
 //TODO: no copy paste
 int marker2frame( size_t marker_id ) {
     switch(marker_id) {
@@ -62,10 +67,10 @@ int marker2frame( size_t marker_id ) {
     /* case 8:  return PIR_TF_RIGHT_SDH_R_K0P; */
     /* case 2:  return PIR_TF_RIGHT_SDH_R_K1P; */
 
-    case 32+5:  return PIR_TF_RIGHT_SDH_L_K0M;
-    case 32+7:  return PIR_TF_RIGHT_SDH_L_K1M;
-    case 32+8:  return PIR_TF_RIGHT_SDH_R_K0P;
-    case 32+2:  return PIR_TF_RIGHT_SDH_R_K1P;
+    case MK0:  return PIR_TF_RIGHT_SDH_L_K0M;
+    case MK1:  return PIR_TF_RIGHT_SDH_L_K1M;
+    case MK2:  return PIR_TF_RIGHT_SDH_R_K0P;
+    case MK3:  return PIR_TF_RIGHT_SDH_R_K1P;
 
         // TODO: find correspondences
     /*     /\* Left *\/ */
@@ -120,6 +125,10 @@ double Pb[13*13] = {0};
 double Wb[7*7] = {0};
 double Vb[13*13] = {0};
 
+#define REC_RAW 0
+#define REC_MED (REC_RAW+4)
+#define REC_KF (REC_MED+1)
+
 int main( int argc, char **argv )
 {
     sns_init();
@@ -127,7 +136,7 @@ int main( int argc, char **argv )
     for( int c; -1 != (c = getopt(argc, argv, "?" )); ) {
         switch(c) {
         case '?':   /* help     */
-            puts( "Usage: rfx-kalman -k FK_POSE_FILE -c CAM_POSE_FILE \n"
+            puts( "Usage: pir-kalman\n"
                   "Kalman filter for piranha arm\n"
                   "\n"
                   "Options:\n"
@@ -144,10 +153,11 @@ int main( int argc, char **argv )
     }
 
     // init
-    ach_channel_t chan_config, chan_marker, chan_reg;
+    ach_channel_t chan_config, chan_marker, chan_reg, chan_reg_rec;
     sns_chan_open( &chan_config, "pir-config", NULL );
     sns_chan_open( &chan_marker, "pir-marker", NULL );
     sns_chan_open( &chan_reg, "pir-reg", NULL );
+    sns_chan_open( &chan_reg_rec, "pir-reg-rec", NULL );
     {
         ach_channel_t *chans[] = {&chan_reg, NULL};
         sns_sigcancel( chans, sns_sig_term_default );
@@ -244,7 +254,6 @@ int main( int argc, char **argv )
 
         // send message
         {
-
             struct sns_msg_tf *tfmsg = sns_msg_tf_local_alloc(2);
             struct timespec now;
             clock_gettime( ACH_DEFAULT_CLOCK, &now );
@@ -252,6 +261,26 @@ int main( int argc, char **argv )
             AA_MEM_CPY( tfmsg->tf[0].data, E_cor, 7 );
             AA_MEM_CPY( tfmsg->tf[1].data, XX_est.tf.data, 7 );
             enum ach_status r = sns_msg_tf_put(&chan_reg, tfmsg);
+            SNS_REQUIRE( r == ACH_OK, "Couldn't put message\n");
+        }
+
+
+        // extra message
+        {
+            struct sns_msg_tf *tfmsg = sns_msg_tf_local_alloc(6);
+            struct timespec now;
+            clock_gettime( ACH_DEFAULT_CLOCK, &now );
+            sns_msg_set_time( &tfmsg->header, &now, 0 );
+            size_t j[4] = {MK0, MK1, MK2, MK3};
+            for( size_t i = 0; i < 4; i ++ ) {
+                size_t frame = (size_t)marker2frame(j[i]);
+                aa_tf_qutr_mulc( AA_MATCOL(tf_abs,7,frame),
+                                 wt_tf->wt_tf[j[i]].tf.data,
+                                 tfmsg->tf[REC_RAW+i].data );
+            }
+            AA_MEM_CPY( tfmsg->tf[REC_MED].data, E_cor, 7 );
+            AA_MEM_CPY( tfmsg->tf[REC_KF].data, XX_est.tf.data, 7 );
+            enum ach_status r = sns_msg_tf_put(&chan_reg_rec, tfmsg);
             SNS_REQUIRE( r == ACH_OK, "Couldn't put message\n");
         }
         aa_mem_region_local_release();
