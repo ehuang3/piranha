@@ -53,6 +53,9 @@
 
 
 double opt_wt_thresh = 1;
+size_t opt_k = 1;
+
+#define N_MAX 8
 
 #define MK0 (32+5)
 #define MK1 (32+7)
@@ -129,12 +132,74 @@ double Vb[13*13] = {0};
 #define REC_MED (REC_RAW+4)
 #define REC_KF (REC_MED+1)
 
+struct cor_samp {
+    double bEk[7*N_MAX];
+    double cEo[7*N_MAX];
+    size_t n;
+};
+
+struct cor_samp *get_samp( ach_channel_t *chan_config,
+                           ach_channel_t *chan_marker,
+                           struct sns_msg_wt_tf **_wt_tf,
+                           double **_tf_abs )
+{
+    struct cor_samp *samp = AA_MEM_REGION_LOCAL_NEW( struct cor_samp );
+    // get marker
+    struct sns_msg_wt_tf *wt_tf;
+    {
+        size_t marker_frame_size;
+        ach_status_t r = sns_msg_wt_tf_local_get( chan_marker, &wt_tf,
+                                                  &marker_frame_size, NULL, ACH_O_WAIT | ACH_O_LAST );
+        SNS_REQUIRE( r == ACH_OK || r == ACH_MISSED_FRAME,
+                     "Error getting markers: %s\n", ach_result_to_string(r) );
+        SNS_REQUIRE( 0 == sns_msg_wt_tf_check_size(wt_tf, marker_frame_size),
+                     "Invalid wt_tf message size: %lu \n", marker_frame_size );
+    }
+    // get config
+    double *config;
+    {
+        size_t frame_size;
+        ach_status_t r = sns_msg_local_get( chan_config, (void**)&config,
+                                            &frame_size, NULL, ACH_O_WAIT | ACH_O_LAST );
+        SNS_REQUIRE( r == ACH_OK || r == ACH_MISSED_FRAME,
+                     "Error getting config: %s\n", ach_result_to_string(r) );
+        size_t expected_size = 2*PIR_TF_CONFIG_MAX*sizeof(double);
+        SNS_REQUIRE( expected_size == frame_size,
+                     "Unexpected frame size: saw %lu, wanted %lu\n",
+                     frame_size, expected_size );
+    }
+
+    // get kinematics
+    double *tf_rel = AA_MEM_REGION_LOCAL_NEW_N( double, 7*PIR_TF_FRAME_MAX );
+    double *tf_abs = AA_MEM_REGION_LOCAL_NEW_N( double, 7*PIR_TF_FRAME_MAX );
+    pir_tf_rel( config, tf_rel );
+    pir_tf_abs( tf_rel, tf_abs );
+
+    // get correspondences
+    samp->n = 0;
+    for( size_t j = 0; j < wt_tf->header.n; j ++ ) {
+        ssize_t frame = marker2frame(j);
+        if( frame < 0 || wt_tf->wt_tf[j].weight < opt_wt_thresh ) continue;
+        assert( samp->n < N_MAX );
+        AA_MEM_CPY( AA_MATCOL(samp->bEk, 7, samp->n), AA_MATCOL(tf_abs,7,frame), 7 );
+        AA_MEM_CPY( AA_MATCOL(samp->cEo, 7, samp->n), wt_tf->wt_tf[j].tf.data, 7 );
+        samp->n++;
+    }
+
+    *_wt_tf = wt_tf;
+    *_tf_abs = tf_abs;
+    return samp;
+}
+
 int main( int argc, char **argv )
 {
     sns_init();
     /* Parse */
-    for( int c; -1 != (c = getopt(argc, argv, "?" )); ) {
+    for( int c; -1 != (c = getopt(argc, argv, "?k:" )); ) {
         switch(c) {
+        case 'k':
+            opt_k = (size_t) atoi(optarg);
+            break;
         case '?':   /* help     */
             puts( "Usage: pir-kalman\n"
                   "Kalman filter for piranha arm\n"
@@ -152,6 +217,8 @@ int main( int argc, char **argv )
         }
     }
 
+    SNS_REQUIRE( opt_k > 0, "Must have positive sample count" );
+
     // init
     ach_channel_t chan_config, chan_marker, chan_reg, chan_reg_rec;
     sns_chan_open( &chan_config, "pir-config", NULL );
@@ -163,6 +230,8 @@ int main( int argc, char **argv )
         sns_sigcancel( chans, sns_sig_term_default );
     }
 
+    struct cor_samp *prev_samps = (struct cor_samp*)malloc(sizeof(struct cor_samp) *(size_t) opt_k);
+    AA_MEM_ZERO( prev_samps, opt_k );
 
     aa_la_diag( 13, Pb, 1 );
 
@@ -173,63 +242,42 @@ int main( int argc, char **argv )
 
     // run
     while( !sns_cx.shutdown ) {
-        // get marker
+
+        // sample
+        double *tf_abs;
         struct sns_msg_wt_tf *wt_tf;
-        {
-            size_t marker_frame_size;
-            ach_status_t r = sns_msg_wt_tf_local_get( &chan_marker, &wt_tf,
-                                                      &marker_frame_size, NULL, ACH_O_WAIT | ACH_O_LAST );
-            SNS_REQUIRE( r == ACH_OK || r == ACH_MISSED_FRAME,
-                         "Error getting markers: %s\n", ach_result_to_string(r) );
-            SNS_REQUIRE( 0 == sns_msg_wt_tf_check_size(wt_tf, marker_frame_size),
-                         "Invalid wt_tf message size: %lu \n", marker_frame_size );
+        struct cor_samp *samp = get_samp(&chan_config, &chan_marker, &wt_tf, &tf_abs);
+
+        // shift into previous
+        for( size_t i = 1; i < opt_k; i ++ ) {
+            prev_samps[i-1] = prev_samps[i];
         }
-        // get config
-        double *config;
-        {
-            size_t frame_size;
-            ach_status_t r = sns_msg_local_get( &chan_config, (void**)&config,
-                                                &frame_size, NULL, ACH_O_WAIT | ACH_O_LAST );
-            SNS_REQUIRE( r == ACH_OK || r == ACH_MISSED_FRAME,
-                         "Error getting config: %s\n", ach_result_to_string(r) );
-            size_t expected_size = 2*PIR_TF_CONFIG_MAX*sizeof(double);
-            SNS_REQUIRE( expected_size == frame_size,
-                         "Unexpected frame size: saw %lu, wanted %lu\n",
-                         frame_size, expected_size );
+        prev_samps[opt_k-1] = *samp;
+
+        // collect data
+        double *X = AA_MEM_REGION_LOCAL_NEW_N(double,7*opt_k*N_MAX);
+        double *Y = AA_MEM_REGION_LOCAL_NEW_N(double,7*opt_k*N_MAX);
+        size_t n = 0;
+        for( size_t i = 0; i < opt_k; i++ ) {
+            for( size_t j = 0; j < prev_samps[i].n; j++ ) {
+                AA_MEM_CPY( AA_MATCOL(X,7,n), prev_samps[i].bEk, 7 );
+                AA_MEM_CPY( AA_MATCOL(Y,7,n), prev_samps[i].cEo, 7 );
+                n++;
+            }
         }
 
-        // get kinematics
-        double *tf_rel = AA_MEM_REGION_LOCAL_NEW_N( double, 7*PIR_TF_FRAME_MAX );
-        double *tf_abs = AA_MEM_REGION_LOCAL_NEW_N( double, 7*PIR_TF_FRAME_MAX );
-        pir_tf_rel( config, tf_rel );
-        pir_tf_abs( tf_rel, tf_abs );
-
-        double *tf_fk = AA_MEM_REGION_LOCAL_NEW_N( double, 7*wt_tf->header.n );
-        double *tf_cam = AA_MEM_REGION_LOCAL_NEW_N( double, 7*wt_tf->header.n );
-        size_t n_cor = 0;
-
-        // get correspondences
-        for( size_t j = 0; j < wt_tf->header.n; j ++ ) {
-            ssize_t frame = marker2frame(j);
-            if( frame < 0 || wt_tf->wt_tf[j].weight < opt_wt_thresh ) continue;
-            AA_MEM_CPY( AA_MATCOL(tf_fk, 7, n_cor), AA_MATCOL(tf_abs,7,frame), 7 );
-            AA_MEM_CPY( AA_MATCOL(tf_cam, 7, n_cor), wt_tf->wt_tf[j].tf.data, 7 );
-            //aa_tf_qminimize(AA_MATCOL(tf_fk, 7, n_cor));
-            //aa_tf_qminimize(AA_MATCOL(tf_cam, 7, n_cor));
-            n_cor++;
-        }
-
-        if( 0 == n_cor ) {
+        if( 0 == n ) {
             // no markers
             continue;
         }
 
+        printf("n: %d\n",n);
         // compute correspondence
         double E_cor[7];
         rfx_tf_cor( RFX_TF_COR_O_ROT_MEDIAN | RFX_TF_COR_O_TRANS_MEDIAN,
-                    n_cor,
-                    tf_fk, 7, tf_fk+4, 7,
-                    tf_cam, 7, tf_cam+4, 7,
+                    n,
+                    X, 7, X+4, 7,
+                    Y, 7, Y+4, 7,
                     E_cor );
 
         //aa_tf_qminimize(E_cor);
@@ -243,7 +291,7 @@ int main( int argc, char **argv )
         }
         double dt = 1e-1;
         rfx_lqg_qutr_process_noise( dt, 1, 1, XX_est.tf.data, Vb );
-        aa_la_diag( 7, Wb, dt*1e2 );
+        aa_la_diag( 7, Wb, dt*1e1 );
 
         rfx_lqg_qutr_predict( dt, XX_est.tf.data, XX_est.dx.data, Pb, Vb );
 
