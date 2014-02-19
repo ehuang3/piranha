@@ -46,9 +46,11 @@
 (defvar *chan-take*)
 (defvar *chan-done*)
 (defvar *chan-reg*)
+(defvar *chan-marker*)
 
 (defun cal-open-channels ()
   (setq *chan-take* (ach:open-channel "pir-cal-take")
+        *chan-done* (ach:open-channel "pir-cal-done")
         *chan-done* (ach:open-channel "pir-cal-done")
         *chan-reg* (ach:open-channel "pir-reg")))
 
@@ -174,3 +176,7 @@
 ;;                    do (pir-cal-1 (quaternion-translation-2 r
 ;;                                                            (aa::vec3 x y z))
 ;;                                  pid :side side))))))
+
+;; Close trial: -0.546172	-0.679798	0.327722	0.363549	1.119467	-0.273449	0.027191
+;; Second trial:
+;; Trial last: -0.475818	-0.731988	0.374556	0.312247	1.557193	-0.045685	0.037869

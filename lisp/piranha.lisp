@@ -73,6 +73,11 @@
                             (x-angle -pi/2)))
 (defparameter +r-right-in+ (g* +r-right+ (x-angle pi)))
 
+(defparameter +wrist-e-sdh+
+  (quaternion-translation-2 (x-angle  (* -60 (/ pi 180)))
+                            (vec3 (+ +lwa4-l-e+ +lwa4-ft-l+ +sdh-l-b+)
+                                  0 0)))
+
 (defun pir-start ()
   (assert (null *ctrl-channel*))
   (setq *ctrl-channel* (ach::open-channel "pir-ctrl"))
@@ -486,6 +491,16 @@
 (defun pir-trajq-store->table (side)
   (pir-trajq-side side (list (make-trajq-point :q *q-up-l* :time 8d0)
                              (make-trajq-point :q *q-over-l* :time 10d0)
+                             (make-trajq-point :q *q-go-l* :time 5d0))))
+
+
+(defun pir-tuck (side)
+  (pir-trajq-side side (list (make-trajq-point :q *q-go-l* :time 8d0)
+                             (make-trajq-point :q *q-over-l* :time 8d0)
+                             (make-trajq-point :q *q-up-l* :time 7d0))))
+
+(defun pir-untuck (side)
+  (pir-trajq-side side (list (make-trajq-point :q *q-over-l* :time 10d0)
                              (make-trajq-point :q *q-go-l* :time 5d0))))
 
 (defun pir-table ()

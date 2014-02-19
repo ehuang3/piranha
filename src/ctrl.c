@@ -64,7 +64,7 @@ void ctrl_zero( pirctrl_cx_t *cx ) {
 
 static void servo_cam( pirctrl_cx_t *cx, struct servo_cam_cx *mode_cx )
 {
-    printf("--\n");
+    //printf("--\n");
     double wEe[7];
     aa_tf_qutr_cmul( AA_MATCOL(cx->tf_abs, 7, PIR_TF_RIGHT_WRIST2),
                      AA_MATCOL(cx->tf_abs, 7, PIR_TF_RIGHT_SDH_FINGERTIP),
@@ -75,7 +75,8 @@ static void servo_cam( pirctrl_cx_t *cx, struct servo_cam_cx *mode_cx )
     double bEer[7];
     aa_tf_qutr_mul( cx->bEc, mode_cx->cEo, bEer );
     AA_MEM_CPY( bEer, mode_cx->bEe, 4 );
-    printf("bEe: "); aa_dump_vec(stdout,bEer,7);
+    //printf("bEe: "); aa_dump_vec(stdout,bEer,7);
+    for( size_t i = 0; i < 3; i++ ) bEer[4+i] += mode_cx->bEe[4+i];
 
     // wrist ref
     double bEwr[7];
@@ -90,7 +91,7 @@ static void servo_cam( pirctrl_cx_t *cx, struct servo_cam_cx *mode_cx )
         SNS_LOG( LOG_ERR, "ws error: %s\n",
                  rfx_status_string((rfx_status_t)r) );
     }
-    printf("--\n");
+    //printf("--\n");
 }
 
 void ctrl_servo_cam( pirctrl_cx_t *cx )
