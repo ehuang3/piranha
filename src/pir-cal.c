@@ -265,6 +265,9 @@ run_cal( void )
             // get marker
         }
         printf("  sample %d: got config\n", i);
+        // Flush, otherwise, signal may case EINTR and bad data
+        fflush(f_q);
+        fflush(f_m);
         }
         // send done
         {
