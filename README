@@ -47,6 +47,38 @@ These arms often lose their encoder offsets.  The script `home.sh` in
 the socanmatic package can be used to reset the home offset to the
 current position.
 
+QUIRKS
+======
+
+Peak PCI issue
+--------------
+
+Following message printed to console:
+    Message from syslogd@calvin at Apr  7 17:05:53 ...
+      kernel:[2668911.504456] Disabling IRQ #16
+
+This is potentially a bug in the Peak PCI kernel driver.
+
+Workaround:
+
+1. Stop all userspace arm drivers
+    piranha $ ./scripts/piranha stop
+
+2. Remove the kernel module and reinsert the module
+    sudo rmmod peak_pci
+    sudo modprobe peak_pci
+
+3. Bring down can interfaces:
+   for i in can0 can1 can2 can3; do sudo ifdown $i; done
+
+4. Bring up can interfaces:
+   for i in can0 can1 can2 can3; do sudo ifup $i; done
+
+5. Start userspace arm drivers
+    piranha $ ./scripts/piranha start
+
+(and remember to re-bias the F/T daemons by sending SIGHUP to pirfilt)
+
 # Local Variables:
 #   mode: markdown
 # End:
