@@ -495,13 +495,13 @@
 
 
 (defun pir-tuck (side)
-  (pir-trajq-side side (list (make-trajq-point :q *q-go-l* :time 8d0)
-                             (make-trajq-point :q *q-over-l* :time 8d0)
-                             (make-trajq-point :q *q-up-l* :time 7d0))))
+  (pir-trajq-side side (list (make-trajq-point :q *q-go-l* :time 5d0)
+                             (make-trajq-point :q *q-over-l* :time 3d0)
+                             (make-trajq-point :q *q-up-l* :time 5d0))))
 
 (defun pir-untuck (side)
-  (pir-trajq-side side (list (make-trajq-point :q *q-over-l* :time 10d0)
-                             (make-trajq-point :q *q-go-l* :time 5d0))))
+  (pir-trajq-side side (list (make-trajq-point :q *q-over-l* :time 5d0)
+                             (make-trajq-point :q *q-go-l* :time 3d0))))
 
 (defun pir-table ()
   (pir-trajq :lr (list (make-trajq-point :q (pir-mirror-cat *q-up-l*)
