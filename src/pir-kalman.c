@@ -57,10 +57,10 @@ size_t opt_k = 1;
 
 #define N_MAX 8
 
-#define MK0 (32+5)
-#define MK1 (32+7)
-#define MK2 (32+8)
-#define MK3 (32+2)
+//#define MK0 (32+5)
+//#define MK1 (32+7)
+//#define MK2 (32+8)
+//#define MK3 (32+2)
 
 //TODO: no copy paste
 int marker2frame( size_t marker_id ) {
@@ -70,10 +70,10 @@ int marker2frame( size_t marker_id ) {
     /* case 8:  return PIR_TF_RIGHT_SDH_R_K0P; */
     /* case 2:  return PIR_TF_RIGHT_SDH_R_K1P; */
 
-    case MK0:  return PIR_TF_RIGHT_SDH_L_K0M;
-    case MK1:  return PIR_TF_RIGHT_SDH_L_K1M;
-    case MK2:  return PIR_TF_RIGHT_SDH_R_K0P;
-    case MK3:  return PIR_TF_RIGHT_SDH_R_K1P;
+    case 9:  return PIR_TF_RIGHT_SDH_L_K0M;
+    case 1:  return PIR_TF_RIGHT_SDH_L_K1M;
+    case 8:  return PIR_TF_RIGHT_SDH_R_K0P;
+    case 3:  return PIR_TF_RIGHT_SDH_R_K1P;
 
         // TODO: find correspondences
     /*     /\* Left *\/ */
@@ -222,7 +222,7 @@ int main( int argc, char **argv )
     // init
     ach_channel_t chan_config, chan_marker, chan_reg, chan_reg_rec;
     sns_chan_open( &chan_config, "pir-config", NULL );
-    sns_chan_open( &chan_marker, "pir-marker", NULL );
+    sns_chan_open( &chan_marker, "markers", NULL );
     sns_chan_open( &chan_reg, "pir-reg", NULL );
     sns_chan_open( &chan_reg_rec, "pir-reg-rec", NULL );
     {
