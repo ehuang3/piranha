@@ -62,6 +62,12 @@ size_t opt_k = 1;
 //#define MK2 (32+8)
 //#define MK3 (32+2)
 
+
+#define MK_R_L0M 9
+#define MK_R_L1M 1
+#define MK_R_R0P 8
+#define MK_R_R1P 3
+
 //TODO: no copy paste
 int marker2frame( size_t marker_id ) {
     switch(marker_id) {
@@ -70,10 +76,10 @@ int marker2frame( size_t marker_id ) {
     /* case 8:  return PIR_TF_RIGHT_SDH_R_K0P; */
     /* case 2:  return PIR_TF_RIGHT_SDH_R_K1P; */
 
-    case 9:  return PIR_TF_RIGHT_SDH_L_K0M;
-    case 1:  return PIR_TF_RIGHT_SDH_L_K1M;
-    case 8:  return PIR_TF_RIGHT_SDH_R_K0P;
-    case 3:  return PIR_TF_RIGHT_SDH_R_K1P;
+    case MK_R_L0M:  return PIR_TF_RIGHT_SDH_L_K0M;
+    case MK_R_L1M:  return PIR_TF_RIGHT_SDH_L_K1M;
+    case MK_R_R0P:  return PIR_TF_RIGHT_SDH_R_K0P;
+    case MK_R_R1P:  return PIR_TF_RIGHT_SDH_R_K1P;
 
         // TODO: find correspondences
     /*     /\* Left *\/ */
@@ -319,7 +325,7 @@ int main( int argc, char **argv )
             struct timespec now;
             clock_gettime( ACH_DEFAULT_CLOCK, &now );
             sns_msg_set_time( &tfmsg->header, &now, 0 );
-            size_t j[4] = {MK0, MK1, MK2, MK3};
+            size_t j[4] = {MK_R_L0M, MK_R_L1M, MK_R_R0P, MK_R_R1P};
             for( size_t i = 0; i < 4; i ++ ) {
                 size_t frame = (size_t)marker2frame(j[i]);
                 aa_tf_qutr_mulc( AA_MATCOL(tf_abs,7,frame),
