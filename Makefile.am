@@ -59,9 +59,10 @@ pir-frame.h: pir-frame.c
 pir-frame.pdf: pir-frame.dot
 	dot pir-frame.dot -Tpdf > pir-frame.pdf
 
-kinematics.f: $(top_srcdir)/src/kinematics.mac
+tf.f kinematics.f: $(top_srcdir)/src/kinematics.mac
 	maxima --very-quiet -b $(top_srcdir)/src/kinematics.mac
 
+tf.f: kinematics.f
 
 noinst_PROGRAMS += iros2014
 iros2014_SOURCES = src/experiments/iros2014.c
