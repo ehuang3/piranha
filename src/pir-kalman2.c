@@ -245,6 +245,7 @@ int main( int argc, char **argv )
     memset(&XX_est,0,sizeof(XX_est));
     memset(&ZZ,0,sizeof(ZZ));
     memset(&UU,0,sizeof(UU));
+    printf("foo\n");
 
     // run
     while( !sns_cx.shutdown ) {
@@ -273,6 +274,7 @@ int main( int argc, char **argv )
         }
 
         if( 0 == n ) {
+            printf("none\n");
             // no markers
             continue;
         }
