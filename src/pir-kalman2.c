@@ -54,6 +54,8 @@
 
 double opt_wt_thresh = 1;
 size_t opt_k = 1;
+size_t *opt_fixed_markers = NULL;
+size_t opt_n_fixed_markers = 0;
 
 #define N_MAX 8
 
@@ -129,6 +131,23 @@ rfx_tf_dx XX_est;
 rfx_tf_dx ZZ;
 rfx_tf_dx UU;
 
+struct madqg_state {
+    double E[7];
+    double dx[6];
+    double *delta_theta;
+    double *delta_x;
+    size_t n;
+    size_t max;
+    size_t i;
+    double P[13*13];
+};
+
+struct madqg_state *state_bEc; ///< camera poses
+struct madqg_state *state_bEm; ///< fixed marker poses
+struct madqg_state state_bEr;  ///< right-hand kinematic pose
+struct madqg_state state_bEl;  ///< left-hand kinematic pose
+struct madqg_state state_rErp; ///< right-hand correction
+struct madqg_state state_lElp; ///< left-hand correction
 
 double Pb[13*13] = {0};
 double Wb[7*7] = {0};
@@ -195,6 +214,102 @@ struct cor_samp *get_samp( ach_channel_t *chan_config,
     *_wt_tf = wt_tf;
     *_tf_abs = tf_abs;
     return samp;
+}
+
+int correct2( struct madqg_state *state, size_t n_obs,
+               const double *bEm, const double *bEc )
+{
+    return rfx_tf_madqg_correct2( 0,
+                                  state->max, state->delta_theta, state->delta_x,
+                                  &state->n, &state->i,
+                                  state->E, state->dx,
+                                  n_obs, bEm, bEc,
+                                  state->P, Wb );
+}
+
+int correct1( struct madqg_state *state, const double *E_obs )
+{
+    return rfx_tf_madqg_correct( 0,
+                                 state->max, state->delta_theta, state->delta_x,
+                                 &state->n, &state->i,
+                                 state->E, state->dx,
+                                 1, E_obs,
+                                 state->P, Wb );
+}
+
+void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
+{
+    // Can initialze camera pose off of arm position, since we know
+    // approximate E.E. pose in body frame from kinematics alone
+
+    // FIXME: buffer overflow
+    double cor_body[7*16];
+    double cor_cam[7*16];
+    size_t i_cor = 0;
+
+    for( size_t j = 0; j < wt_tf->header.n; j ++ ) {
+        ssize_t frame = marker2frame(j);
+        if( wt_tf->wt_tf[j].weight < opt_wt_thresh ) continue;
+        if( frame  ) {
+            /**** ARM ****/
+            AA_MEM_CPY( AA_MATCOL(cor_body, 7, i_cor), AA_MATCOL(tf_abs,7,frame), 7 );
+            AA_MEM_CPY( AA_MATCOL(cor_cam, 7, i_cor), wt_tf->wt_tf[j].tf.data, 7 );
+            i_cor++;
+        } else {
+            /**** FIXED MARKERS ****/
+            for( size_t k = 0; k < opt_n_fixed_markers; k ++ ) {
+                if( opt_fixed_markers[k] == j ) {
+                    // found kth marker
+                    // use as a correspondance
+                    AA_MEM_CPY( cor_body+7*i_cor, state_bEm[k].E, 7 );
+                    AA_MEM_CPY( cor_cam+7*i_cor, wt_tf->wt_tf[j].tf.data, 7 );
+                    i_cor++;
+                    double E_obs[7];
+                    aa_tf_qutr_mul( state_bEc[i_cam].E, wt_tf->wt_tf[j].tf.data, E_obs );
+                    correct1( state_bEm+k, E_obs );
+                }
+            }
+        }
+    }
+    /* Correct Camera */
+    correct2( state_bEc+i_cam, i_cor, cor_body, cor_cam );
+}
+
+void update( ach_channel_t *chan_config )
+{
+    /**** KINEMATICS ****/
+    /* Wait Sample */
+    double *config;
+    {
+        size_t frame_size;
+        ach_status_t r = sns_msg_local_get( chan_config, (void**)&config,
+                                            &frame_size, NULL, ACH_O_WAIT | ACH_O_LAST );
+        SNS_REQUIRE( r == ACH_OK || r == ACH_MISSED_FRAME,
+                     "Error getting config: %s\n", ach_result_to_string(r) );
+        size_t expected_size = 2*PIR_TF_CONFIG_MAX*sizeof(double);
+        SNS_REQUIRE( expected_size == frame_size,
+                     "Unexpected frame size: saw %lu, wanted %lu\n",
+                     frame_size, expected_size );
+    }
+    /* Maybe update kinematics */
+    double *tf_rel = AA_MEM_REGION_LOCAL_NEW_N( double, 7*PIR_TF_FRAME_MAX );
+    double *tf_abs = AA_MEM_REGION_LOCAL_NEW_N( double, 7*PIR_TF_FRAME_MAX );
+    pir_tf_rel( config, tf_rel );
+    pir_tf_abs( tf_rel, tf_abs );
+    AA_MEM_CPY( state_bEl.E, tf_abs+7*PIR_TF_LEFT_WRIST0,7 );
+    AA_MEM_CPY( state_bEr.E, tf_abs+7*PIR_TF_LEFT_WRIST0,7 );
+
+    /* PREDICT */
+    double dt = 1e-1; // FIXME
+    rfx_lqg_qutr_predict( dt, XX_est.tf.data, XX_est.dx.data, Pb, Vb );
+
+    /**** CAMERAS ****/
+    /* Get Sample */
+
+    /* CORRECT */
+
+    /* CLEANUP */
+    aa_mem_region_local_release();
 }
 
 int main( int argc, char **argv )
@@ -279,7 +394,6 @@ int main( int argc, char **argv )
             continue;
         }
 
-        printf("n: %d\n",n);
         // compute correspondence
         double E_cor[7];
         rfx_tf_cor( RFX_TF_COR_O_ROT_MEDIAN | RFX_TF_COR_O_TRANS_MEDIAN,
