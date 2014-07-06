@@ -44,6 +44,10 @@ bin_PROGRAMS += pir-kalman
 pir_kalman_SOURCES = src/pir-kalman.c
 pir_kalman_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
 
+bin_PROGRAMS += pir-kalman2
+pir_kalman2_SOURCES = src/pir-kalman2.c
+pir_kalman2_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
+
 bin_PROGRAMS += pir-dump
 pir_dump_SOURCES = src/pir-dump.c
 pir_dump_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
