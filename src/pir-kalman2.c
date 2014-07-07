@@ -62,67 +62,29 @@ char **opt_cam = NULL;
 
 #define N_MAX 8
 
-//#define MK0 (32+5)
-//#define MK1 (32+7)
-//#define MK2 (32+8)
-//#define MK3 (32+2)
-
-
 #define MK_R_L0M 2
 #define MK_R_L1M 1
 #define MK_R_R0P 8
 #define MK_R_R1P 3
 
-//TODO: no copy paste
+#define MK_L_L0M 23
+#define MK_L_L1M 24
+#define MK_L_R0P 25
+#define MK_L_R1P 26
+
 int marker2frame( size_t marker_id ) {
     switch(marker_id) {
-    /* case 5:  return PIR_TF_RIGHT_SDH_L_K0M; */
-    /* case 7:  return PIR_TF_RIGHT_SDH_L_K1M; */
-    /* case 8:  return PIR_TF_RIGHT_SDH_R_K0P; */
-    /* case 2:  return PIR_TF_RIGHT_SDH_R_K1P; */
-
+        // right
     case MK_R_L0M:  return PIR_TF_RIGHT_SDH_L_K0M;
     case MK_R_L1M:  return PIR_TF_RIGHT_SDH_L_K1M;
     case MK_R_R0P:  return PIR_TF_RIGHT_SDH_R_K0P;
     case MK_R_R1P:  return PIR_TF_RIGHT_SDH_R_K1P;
 
-        // TODO: find correspondences
-    /*     /\* Left *\/ */
-    /* case -1: return PIR_TF_LEFT_SDH_L_K0M; */
-    //case 0: return PIR_TF_LEFT_SDH_L_K0P;
-    /* case -1: return PIR_TF_LEFT_SDH_L_K1M; */
-    /* case -1: return PIR_TF_LEFT_SDH_L_K1P; */
-
-    /*     // T */
-    /* case -1: return PIR_TF_LEFT_SDH_T_K0M; */
-    /* case -1: return PIR_TF_LEFT_SDH_T_K0P; */
-    /* case -1: return PIR_TF_LEFT_SDH_T_K1M; */
-    /* case -1: return PIR_TF_LEFT_SDH_T_K1P; */
-
-    /*     // R */
-    //case 1: return PIR_TF_LEFT_SDH_R_K0M;
-    /* case -1: return PIR_TF_LEFT_SDH_R_K0P; */
-    /* case -1: return PIR_TF_LEFT_SDH_R_K1M; */
-    //case 9: return PIR_TF_LEFT_SDH_R_K1P;
-
-    /*     /\* Right *\/ */
-    /*     // L */
-    /* case -1: return PIR_TF_RIGHT_SDH_L_K0M; */
-    /* case 0: return PIR_TF_RIGHT_SDH_L_K0P; */
-    /* case -1: return PIR_TF_RIGHT_SDH_L_K1M; */
-    /* case -1: return PIR_TF_RIGHT_SDH_L_K1P; */
-
-    /*     // T */
-    /* case -1: return PIR_TF_RIGHT_SDH_T_K0M; */
-    /* case -1: return PIR_TF_RIGHT_SDH_T_K0P; */
-    /* case -1: return PIR_TF_RIGHT_SDH_T_K1M; */
-    /* case -1: return PIR_TF_RIGHT_SDH_T_K1P; */
-
-    /*     // R */
-    /* case 1: return PIR_TF_RIGHT_SDH_R_K0M; */
-    /* case -1: return PIR_TF_RIGHT_SDH_R_K0P; */
-    /* case 9: return PIR_TF_RIGHT_SDH_R_K1M; */
-    /* case -1: return PIR_TF_RIGHT_SDH_R_K1P; */
+        // left
+    case MK_L_L0M:  return PIR_TF_LEFT_SDH_L_K0M;
+    case MK_L_L1M:  return PIR_TF_LEFT_SDH_L_K1M;
+    case MK_L_R0P:  return PIR_TF_LEFT_SDH_R_K0P;
+    case MK_L_R1P:  return PIR_TF_LEFT_SDH_R_K1P;
 
     default: return -1;
     }
