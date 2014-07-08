@@ -108,7 +108,7 @@ void init_state( struct madqg_state *state, size_t k ) {
     state->delta_theta = AA_NEW0_AR( double, k );
     state->delta_x = AA_NEW0_AR( double, k );
     state->n = 0;
-    state->max = 0;
+    state->max = opt_k;
     state->i = 0;
     aa_la_diag( 13, state->P, 1 );
 }
@@ -133,14 +133,26 @@ double Vb[13*13] = {0};
 #define REC_KF (REC_MED+1)
 
 int correct2( struct madqg_state *state, size_t n_obs,
-               const double *bEm, const double *bEc )
+              const double *bEm, const double *cEo )
 {
-    return rfx_tf_madqg_correct2( 0,
-                                  state->max, state->delta_theta, state->delta_x,
-                                  &state->n, &state->i,
-                                  state->E, state->dx,
-                                  n_obs, bEm, bEc,
-                                  state->P, Wb );
+    // FIXME: dt
+    /* printf("correct2()\n"); */
+    /* for( size_t i = 0; i < n_obs; i ++ ) { */
+    /*     printf("bEm[%lu]: ", i); aa_io_d_print( stdout, 7, bEm + 7*i, 1 ); */
+    /*     printf("cEo[%lu]: ", i); aa_io_d_print( stdout, 7, cEo + 7*i, 1 ); */
+    /* } */
+    //FIXME: dt
+    int r = rfx_tf_madqg_correct2( 1,
+                                   state->max, state->delta_theta, state->delta_x,
+                                   &state->n, &state->i,
+                                   state->E, state->dx,
+                                   n_obs, bEm, cEo,
+                                   state->P, Wb );
+    //AA_MEM_ZERO( state->dx, 6 );
+    if( r ) {
+        SNS_LOG( LOG_ERR, "MADQG Correct2 failed: %d\n", r );
+    }
+    return r;
 }
 
 int correct1( struct madqg_state *state, const double *E_obs )
@@ -155,6 +167,8 @@ int correct1( struct madqg_state *state, const double *E_obs )
 
 int predict( double dt, struct madqg_state *state )
 {
+
+    rfx_lqg_qutr_process_noise( dt, 1, 10, state->E, Vb );
     return rfx_lqg_qutr_predict( dt, state->E, state->dx, state->P, Vb );
 }
 
@@ -200,7 +214,7 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
 
 void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
 {
-    SNS_LOG( LOG_DEBUG + 1, "update()\n");
+    SNS_LOG( LOG_DEBUG + 2, "update()\n");
     /**** KINEMATICS ****/
     /* Wait Sample */
     double *config = NULL;
@@ -209,7 +223,7 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
         size_t frame_size;
         r_config = sns_msg_local_get( chan_config, (void**)&config,
                                       &frame_size, NULL, ACH_O_WAIT | ACH_O_LAST );
-        SNS_LOG( LOG_DEBUG + 1, "r_config: %s\n", ach_result_to_string(r_config));
+        SNS_LOG( LOG_DEBUG + 2, "r_config: %s\n", ach_result_to_string(r_config));
         switch( r_config ) {
         case ACH_OK:
         case ACH_MISSED_FRAME:
@@ -223,7 +237,7 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
         }
         /* Maybe update kinematics */
         if( config ) {
-            //SNS_LOG( LOG_DEBUG + 1, "got config\n");
+            SNS_LOG( LOG_DEBUG + 2, "got config\n");
             size_t expected_size = 2*PIR_TF_CONFIG_MAX*sizeof(double);
             SNS_REQUIRE( expected_size == frame_size,
                          "Unexpected frame size: saw %lu, wanted %lu\n",
@@ -236,8 +250,8 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
     }
 
     /* PREDICT */
-    SNS_LOG( LOG_DEBUG + 1, "update(): predict\n");
-    double dt = 1e-1; // FIXME
+    SNS_LOG( LOG_DEBUG + 2, "update(): predict\n");
+    double dt = 1e-3; // FIXME
     for( size_t i = 0; i < n_cam; i ++ ) {
         predict( dt, state_bEc );
     }
@@ -246,11 +260,11 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
     }
     predict( dt, &state_bEr );
     predict( dt, &state_bEl );
-    predict( dt, &state_rErp );
-    predict( dt, &state_lElp );
+    /* predict( dt, &state_rErp ); */
+    /* predict( dt, &state_lElp ); */
 
     /**** CAMERAS ****/
-    SNS_LOG( LOG_DEBUG + 1, "update(): cam\n");
+    SNS_LOG( LOG_DEBUG + 2, "update(): cam\n");
     /* Get Sample */
     for( size_t i = 0; i < n_cam; i ++ ) {
         struct sns_msg_wt_tf *wt_tf = NULL;
@@ -285,7 +299,7 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
 
 int output( ach_channel_t *chan_reg ) {
 
-    SNS_LOG( LOG_DEBUG+1, "output()\n");
+    SNS_LOG( LOG_DEBUG+2, "output()\n");
     struct sns_msg_tf *tfmsg = sns_msg_tf_local_alloc( (uint32_t)(2 + opt_n_cam + opt_n_fixed_markers ));
     struct timespec now;
 
@@ -376,6 +390,10 @@ int main( int argc, char **argv )
     init_state( &state_bEr, opt_k );
     init_state( &state_lElp, opt_k );
     init_state( &state_rErp, opt_k );
+
+    // FIXME: dt
+    aa_la_diag( 7, Wb, .5 );
+    aa_la_diag( 13, Pb, 10 );
 
     SNS_LOG( LOG_INFO, "starting main loop\n");
     // run
