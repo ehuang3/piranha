@@ -53,7 +53,7 @@
 
 
 double opt_wt_thresh = 1;
-size_t opt_k = 1;
+size_t opt_k = 16;
 size_t *opt_fixed_markers = NULL;
 size_t opt_n_fixed_markers = 0;
 
@@ -163,6 +163,7 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
     // Can initialze camera pose off of arm position, since we know
     // approximate E.E. pose in body frame from kinematics alone
 
+
     // FIXME: buffer overflow
     double cor_body[7*16];
     double cor_cam[7*16];
@@ -199,6 +200,7 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
 
 void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
 {
+    SNS_LOG( LOG_DEBUG + 1, "update()\n");
     /**** KINEMATICS ****/
     /* Wait Sample */
     double *config = NULL;
@@ -207,16 +209,21 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
         size_t frame_size;
         r_config = sns_msg_local_get( chan_config, (void**)&config,
                                       &frame_size, NULL, ACH_O_WAIT | ACH_O_LAST );
+        SNS_LOG( LOG_DEBUG + 1, "r_config: %s\n", ach_result_to_string(r_config));
         switch( r_config ) {
         case ACH_OK:
         case ACH_MISSED_FRAME:
         case ACH_STALE_FRAMES:
             break;
+        case ACH_CANCELED:
+            SNS_LOG(LOG_NOTICE, "canceled\n");
+            return;
         default:
             SNS_DIE( "Error getting config: %s\n", ach_result_to_string(r_config) );
         }
         /* Maybe update kinematics */
         if( config ) {
+            //SNS_LOG( LOG_DEBUG + 1, "got config\n");
             size_t expected_size = 2*PIR_TF_CONFIG_MAX*sizeof(double);
             SNS_REQUIRE( expected_size == frame_size,
                          "Unexpected frame size: saw %lu, wanted %lu\n",
@@ -229,6 +236,7 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
     }
 
     /* PREDICT */
+    SNS_LOG( LOG_DEBUG + 1, "update(): predict\n");
     double dt = 1e-1; // FIXME
     for( size_t i = 0; i < n_cam; i ++ ) {
         predict( dt, state_bEc );
@@ -242,13 +250,14 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
     predict( dt, &state_lElp );
 
     /**** CAMERAS ****/
+    SNS_LOG( LOG_DEBUG + 1, "update(): cam\n");
     /* Get Sample */
     for( size_t i = 0; i < n_cam; i ++ ) {
         struct sns_msg_wt_tf *wt_tf = NULL;
         /* Get message */
         size_t marker_frame_size;
         ach_status_t r = sns_msg_wt_tf_local_get( &chan_cam[i], &wt_tf,
-                                                  &marker_frame_size, NULL, ACH_O_WAIT | ACH_O_LAST );
+                                                  &marker_frame_size, NULL, ACH_O_LAST );
         switch( r ) {
         case ACH_OK:
         case ACH_MISSED_FRAME:
@@ -259,9 +268,13 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
         }
         /* CORRECT */
         if( wt_tf ) {
-            SNS_REQUIRE( 0 == sns_msg_wt_tf_check_size(wt_tf, marker_frame_size),
-                         "Invalid wt_tf message size: %lu \n", marker_frame_size );
-            update_camera( state_tf_abs, i, wt_tf );
+            ssize_t size_delta = sns_msg_wt_tf_check_size( wt_tf, marker_frame_size );
+            if( size_delta ) {
+                SNS_LOG( LOG_ERR, "Bad frame size, delta of %ld\n", size_delta);
+            } else {
+                SNS_LOG( LOG_DEBUG + 1, "got cam: %lu (%s)\n", i, ach_result_to_string(r));
+                update_camera( state_tf_abs, i, wt_tf );
+            }
         }
     }
 
@@ -271,6 +284,8 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
 
 
 int output( ach_channel_t *chan_reg ) {
+
+    SNS_LOG( LOG_DEBUG+1, "output()\n");
     struct sns_msg_tf *tfmsg = sns_msg_tf_local_alloc( (uint32_t)(2 + opt_n_cam + opt_n_fixed_markers ));
     struct timespec now;
 
@@ -294,8 +309,9 @@ int main( int argc, char **argv )
 {
     sns_init();
     /* Parse */
-    for( int c; -1 != (c = getopt(argc, argv, "?k:c:" )); ) {
+    for( int c; -1 != (c = getopt(argc, argv, "?k:c:" SNS_OPTSTRING )); ) {
         switch(c) {
+            SNS_OPTCASES
         case 'k':
             opt_k = (size_t) atoi(optarg);
             break;
@@ -324,26 +340,35 @@ int main( int argc, char **argv )
 
     SNS_REQUIRE( opt_k > 0, "Must have positive sample count" );
 
+    for( size_t i = 0; i < opt_n_cam; i ++ ) {
+        SNS_LOG( LOG_DEBUG, "marker channel %lu: %s\n",
+                 i, opt_cam[i] );
+    }
+    SNS_LOG( LOG_DEBUG, "%lu cameras\n", opt_n_cam);
+    SNS_LOG( LOG_DEBUG, "%lu fixed markers\n", opt_n_fixed_markers);
+
     // init
-    ach_channel_t chan_config, *chan_marker, chan_reg, chan_reg_rec;
+    ach_channel_t chan_config, *chan_marker, chan_reg;
     sns_chan_open( &chan_config, "pir-config", NULL );
     sns_chan_open( &chan_reg, "pir-reg2", NULL );
-    sns_chan_open( &chan_reg_rec, "pir-reg-rec", NULL );
 
-    chan_marker = (ach_channel_t*)malloc( sizeof(ach_channel_t*) * opt_n_cam );
+    chan_marker = (ach_channel_t*)malloc( sizeof(ach_channel_t) * opt_n_cam );
     for( size_t i = 0; i < opt_n_cam; i ++ ) {
         sns_chan_open( &chan_marker[i], opt_cam[i], NULL );
     }
 
     {
-        ach_channel_t *chans[] = {&chan_reg, NULL};
+        ach_channel_t *chans[] = {&chan_config, NULL, NULL};
         sns_sigcancel( chans, sns_sig_term_default );
     }
 
+    SNS_LOG( LOG_DEBUG, "initializing state structs\n");
+    state_bEc = AA_NEW_AR(struct madqg_state, opt_n_cam);
     for( size_t i = 0; i < opt_n_cam; i ++ ) {
         init_state( &state_bEc[i], opt_k );
     }
 
+    state_bEm = AA_NEW_AR(struct madqg_state, opt_n_fixed_markers);
     for( size_t i = 0; i < opt_n_fixed_markers; i ++ ) {
         init_state( &state_bEm[i], opt_k );
     }
@@ -352,6 +377,7 @@ int main( int argc, char **argv )
     init_state( &state_lElp, opt_k );
     init_state( &state_rErp, opt_k );
 
+    SNS_LOG( LOG_INFO, "starting main loop\n");
     // run
     while( !sns_cx.shutdown ) {
 
@@ -360,4 +386,6 @@ int main( int argc, char **argv )
 
         aa_mem_region_local_release();
     }
+    SNS_LOG( LOG_NOTICE, "Exiting gracefully\n");
+    return 0;
 }
