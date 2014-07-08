@@ -296,25 +296,46 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
     aa_mem_region_local_release();
 }
 
+int output_chan( struct timespec now,
+                 ach_channel_t *chan,
+                 struct madqg_state *state,
+                 size_t n )
+{
+    struct sns_msg_tf *msg = sns_msg_tf_local_alloc( (uint32_t) n );
+    sns_msg_set_time( &msg->header, &now, 0 );
+    for( size_t i = 0; i < n; i ++ )
+        AA_MEM_CPY( msg->tf[i].data, state[i].E, 7 );
 
-int output( ach_channel_t *chan_reg ) {
+    enum ach_status r = sns_msg_tf_put(chan, msg);
+    SNS_REQUIRE( ACH_OK == r, "Couldn't put message\n");
+    return 0;
+}
 
-    SNS_LOG( LOG_DEBUG+2, "output()\n");
-    struct sns_msg_tf *tfmsg = sns_msg_tf_local_alloc( (uint32_t)(2 + opt_n_cam + opt_n_fixed_markers ));
+int output( ach_channel_t *chan_reg_cam, ach_channel_t *chan_reg_marker, ach_channel_t *chan_reg_ee  ) {
     struct timespec now;
-
     clock_gettime( ACH_DEFAULT_CLOCK, &now );
-    sns_msg_set_time( &tfmsg->header, &now, 0 );
+    SNS_LOG( LOG_DEBUG+2, "output()\n");
 
-    AA_MEM_CPY( tfmsg->tf[0].data, state_bEl.E, 7 );
-    AA_MEM_CPY( tfmsg->tf[1].data, state_bEr.E, 7 );
-    for( size_t i = 0; i < opt_n_cam; i ++ )
-        AA_MEM_CPY( tfmsg->tf[2+i].data, state_bEc[i].E, 7 );
-    for( size_t i = 0; i < opt_n_fixed_markers; i ++ )
-        AA_MEM_CPY( tfmsg->tf[2+opt_n_cam+i].data, state_bEm[i].E, 7 );
+    output_chan( now, chan_reg_cam, state_bEc, opt_n_cam );
+    output_chan( now, chan_reg_marker, state_bEc, opt_n_fixed_markers );
+    //output_chan( now, chan_reg_e, state_bEc, opt_n_fixed_markers );
 
-    enum ach_status r = sns_msg_tf_put(chan_reg, tfmsg);
-    SNS_REQUIRE( r == ACH_OK, "Couldn't put message\n");
+    /* struct sns_msg_tf *tf_cam = sns_msg_tf_local_alloc( (uint32_t) opt_n_cam ); */
+    /* struct sns_msg_tf *tf_marker = sns_msg_tf_local_alloc( (uint32_t) opt_n_fixed_markers ); */
+    /* struct sns_msg_tf *tf_ee = sns_msg_tf_local_alloc( 2 ); */
+
+    /* sns_msg_set_time( &tfmsg->header, &now, 0 ); */
+
+    /* AA_MEM_CPY( tfmsg->tf[0].data, state_bEl.E, 7 ); */
+    /* AA_MEM_CPY( tfmsg->tf[1].data, state_bEr.E, 7 ); */
+    /* for( size_t i = 0; i < opt_n_cam; i ++ ) */
+    /*     AA_MEM_CPY( tfmsg->tf[2+i].data, state_bEc[i].E, 7 ); */
+    /* for( size_t i = 0; i < opt_n_fixed_markers; i ++ ) */
+    /*     AA_MEM_CPY( tfmsg->tf[2+opt_n_cam+i].data, state_bEm[i].E, 7 ); */
+
+    /* enum ach_status r = sns_msg_tf_put(chan_reg, tfmsg); */
+    /* SNS_REQUIRE( r == ACH_OK, "Couldn't put message\n"); */
+
     return 0;
 }
 
@@ -362,9 +383,11 @@ int main( int argc, char **argv )
     SNS_LOG( LOG_DEBUG, "%lu fixed markers\n", opt_n_fixed_markers);
 
     // init
-    ach_channel_t chan_config, *chan_marker, chan_reg;
+    ach_channel_t chan_config, *chan_marker, chan_reg_cam, chan_reg_marker, chan_reg_ee;
     sns_chan_open( &chan_config, "pir-config", NULL );
-    sns_chan_open( &chan_reg, "pir-reg2", NULL );
+    sns_chan_open( &chan_reg_cam, "pir-reg-cam", NULL );
+    sns_chan_open( &chan_reg_marker, "pir-reg-marker", NULL );
+    sns_chan_open( &chan_reg_ee, "pir-reg-ee", NULL );
 
     chan_marker = (ach_channel_t*)malloc( sizeof(ach_channel_t) * opt_n_cam );
     for( size_t i = 0; i < opt_n_cam; i ++ ) {
@@ -400,7 +423,7 @@ int main( int argc, char **argv )
     while( !sns_cx.shutdown ) {
 
         update( &chan_config, chan_marker, opt_n_cam );
-        output( &chan_reg );
+        output( &chan_reg_cam, &chan_reg_marker, &chan_reg_ee );
 
         aa_mem_region_local_release();
     }
