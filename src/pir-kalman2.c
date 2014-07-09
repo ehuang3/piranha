@@ -90,6 +90,24 @@ int marker2frame( size_t marker_id ) {
     }
 }
 
+int frame_side( ssize_t frame ) {
+    switch(frame) {
+        // right
+    case PIR_TF_RIGHT_SDH_L_K0M:
+    case PIR_TF_RIGHT_SDH_L_K1M:
+    case PIR_TF_RIGHT_SDH_R_K0P:
+    case PIR_TF_RIGHT_SDH_R_K1P:
+        return PIR_RIGHT;
+        // left
+    case PIR_TF_LEFT_SDH_L_K0M:
+    case PIR_TF_LEFT_SDH_L_K1M:
+    case PIR_TF_LEFT_SDH_R_K0P:
+    case PIR_TF_LEFT_SDH_R_K1P:
+        return PIR_LEFT;
+    default: return -1;
+    }
+}
+
 struct madqg_state {
     double E[7];
     double dx[6];
@@ -177,21 +195,51 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
     // Can initialze camera pose off of arm position, since we know
     // approximate E.E. pose in body frame from kinematics alone
 
-
     // FIXME: buffer overflow
     double cor_body[7*16];
     double cor_cam[7*16];
     size_t i_cor = 0;
 
+    double l_p[7*16];
+    size_t i_lp = 0;
+
+    double r_p[7*16];
+    size_t i_rp = 0;
+
+    double *bEc = state_bEc[i_cam].E;
+
     // TODO: E.E. relative
     for( size_t j = 0; j < wt_tf->header.n; j ++ ) {
-        ssize_t frame = marker2frame(j);
         if( wt_tf->wt_tf[j].weight < opt_wt_thresh ) continue;
-        if( frame  ) {
+        ssize_t frame = marker2frame(j);
+        double *cEm = wt_tf->wt_tf[j].tf.data;
+        if( frame  >= 0 ) {
             /**** ARM ****/
-            AA_MEM_CPY( AA_MATCOL(cor_body, 7, i_cor), AA_MATCOL(tf_abs,7,frame), 7 );
-            AA_MEM_CPY( AA_MATCOL(cor_cam, 7, i_cor), wt_tf->wt_tf[j].tf.data, 7 );
+            double *bEm = AA_MATCOL(tf_abs,7,frame);
+            ssize_t side = frame_side(frame);
+            assert( PIR_LEFT == side || PIR_RIGHT == side );
+
+            // find wrist to marker
+            double *bEw = AA_MATCOL(tf_abs, 7, ((PIR_LEFT==side) ? PIR_TF_LEFT_WRIST2 : PIR_TF_RIGHT_WRIST2) );
+            double wEm[7]; aa_tf_qutr_cmul( bEw, bEm, wEm );
+
+            // for camera update
+            AA_MEM_CPY( AA_MATCOL(cor_body, 7, i_cor), bEm, 7 );
+            AA_MEM_CPY( AA_MATCOL(cor_cam, 7, i_cor), cEm, 7 );
             i_cor++;
+
+            // for E.E update
+            // find wrist to wrist'
+            double e0[7], e1[7];
+            aa_tf_qutr_cmul( bEw, bEc, e0 );
+            aa_tf_qutr_mul( e0, cEm, e1 );
+            // add to wrist updater
+            if( PIR_LEFT == side )
+                aa_tf_qutr_mulc( e1, wEm, AA_MATCOL(l_p,7,i_lp++) );
+            else
+                aa_tf_qutr_mulc( e1, wEm, AA_MATCOL(r_p,7,i_rp++) );
+
+
         } else {
             /**** FIXED MARKERS ****/
             for( size_t k = 0; k < opt_n_fixed_markers; k ++ ) {
@@ -202,8 +250,8 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
                     AA_MEM_CPY( cor_cam+7*i_cor, wt_tf->wt_tf[j].tf.data, 7 );
                     i_cor++;
                     double E_obs[7];
-                    aa_tf_qutr_mul( state_bEc[i_cam].E, wt_tf->wt_tf[j].tf.data, E_obs );
-                    correct1( state_bEm+k, E_obs );
+                    aa_tf_qutr_mul( bEc, cEm, E_obs );
+                    correct1( &state_bEm[k], E_obs );
                 }
             }
         }
@@ -317,7 +365,7 @@ int output( ach_channel_t *chan_reg_cam, ach_channel_t *chan_reg_marker, ach_cha
     SNS_LOG( LOG_DEBUG+2, "output()\n");
 
     output_chan( now, chan_reg_cam, state_bEc, opt_n_cam );
-    if( opt_n_fixed_markers ) output_chan( now, chan_reg_marker, state_bEc, opt_n_fixed_markers );
+    if( opt_n_fixed_markers ) output_chan( now, chan_reg_marker, state_bEm, opt_n_fixed_markers );
     //output_chan( now, chan_reg_e, state_bEc, opt_n_fixed_markers );
 
     /* struct sns_msg_tf *tf_cam = sns_msg_tf_local_alloc( (uint32_t) opt_n_cam ); */
