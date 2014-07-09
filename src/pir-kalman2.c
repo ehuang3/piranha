@@ -113,6 +113,7 @@ struct madqg_state {
     double dx[6];
     double *delta_theta;
     double *delta_x;
+    double *z_hist;
     size_t n;
     size_t max;
     size_t i;
@@ -125,6 +126,7 @@ void init_state( struct madqg_state *state, size_t k ) {
     AA_MEM_ZERO( state->dx, 6 );
     state->delta_theta = AA_NEW0_AR( double, k );
     state->delta_x = AA_NEW0_AR( double, k );
+    state->z_hist = AA_NEW0_AR( double, k*7 );
     state->n = 0;
     state->max = opt_k;
     state->i = 0;
@@ -133,8 +135,6 @@ void init_state( struct madqg_state *state, size_t k ) {
 
 struct madqg_state *state_bEc; ///< camera poses
 struct madqg_state *state_bEm; ///< fixed marker poses
-struct madqg_state state_bEr;  ///< right-hand kinematic pose
-struct madqg_state state_bEl;  ///< left-hand kinematic pose
 struct madqg_state state_rErp; ///< right-hand correction
 struct madqg_state state_lElp; ///< left-hand correction
 
@@ -150,37 +150,52 @@ double Vb[13*13] = {0};
 #define REC_MED (REC_RAW+4)
 #define REC_KF (REC_MED+1)
 
-int correct2( struct madqg_state *state, size_t n_obs,
-              const double *bEm, const double *cEo )
+/* int correct2( struct madqg_state *state, size_t n_obs, */
+/*               const double *bEm, const double *cEo ) */
+/* { */
+/*     // FIXME: dt */
+/*     /\* printf("correct2()\n"); *\/ */
+/*     /\* for( size_t i = 0; i < n_obs; i ++ ) { *\/ */
+/*     /\*     printf("bEm[%lu]: ", i); aa_io_d_print( stdout, 7, bEm + 7*i, 1 ); *\/ */
+/*     /\*     printf("cEo[%lu]: ", i); aa_io_d_print( stdout, 7, cEo + 7*i, 1 ); *\/ */
+/*     /\* } *\/ */
+/*     //FIXME: dt */
+/*     int r = rfx_tf_madqg_correct2( 1, */
+/*                                    state->max, state->delta_theta, state->delta_x, */
+/*                                    &state->n, &state->i, */
+/*                                    state->E, state->dx, */
+/*                                    n_obs, bEm, cEo, */
+/*                                    state->P, Wb ); */
+/*     //AA_MEM_ZERO( state->dx, 6 ); */
+/*     if( r ) { */
+/*         SNS_LOG( LOG_ERR, "MADQG Correct2 failed: %d\n", r ); */
+/*     } */
+/*     return r; */
+/* } */
+
+int correct1( struct madqg_state *state, const double *E_obs, size_t n )
 {
-    // FIXME: dt
-    /* printf("correct2()\n"); */
-    /* for( size_t i = 0; i < n_obs; i ++ ) { */
-    /*     printf("bEm[%lu]: ", i); aa_io_d_print( stdout, 7, bEm + 7*i, 1 ); */
-    /*     printf("cEo[%lu]: ", i); aa_io_d_print( stdout, 7, cEo + 7*i, 1 ); */
-    /* } */
     //FIXME: dt
-    int r = rfx_tf_madqg_correct2( 1,
-                                   state->max, state->delta_theta, state->delta_x,
-                                   &state->n, &state->i,
-                                   state->E, state->dx,
-                                   n_obs, bEm, cEo,
-                                   state->P, Wb );
+    /* int r = rfx_tf_madqg_correct( 1, */
+    /*                               state->max, state->delta_theta, state->delta_x, */
+    /*                               &state->n, &state->i, */
+    /*                               state->E, state->dx, */
+    /*                               n, E_obs, */
+    /*                               state->P, Wb ); */
+    int r = rfx_tf_madqg_correct_median_window(
+        1,
+        state->max, state->z_hist,
+        &state->n, &state->i,
+        state->E, state->dx,
+        n, E_obs,
+        state->P, Wb );
+
     //AA_MEM_ZERO( state->dx, 6 );
+    //AA_MEM_ZERO( state_rErp.dx, 6 );
     if( r ) {
-        SNS_LOG( LOG_ERR, "MADQG Correct2 failed: %d\n", r );
+        SNS_LOG( LOG_ERR, "MADQG Correct failed: %d\n", r );
     }
     return r;
-}
-
-int correct1( struct madqg_state *state, const double *E_obs )
-{
-    return rfx_tf_madqg_correct( 0,
-                                 state->max, state->delta_theta, state->delta_x,
-                                 &state->n, &state->i,
-                                 state->E, state->dx,
-                                 1, E_obs,
-                                 state->P, Wb );
 }
 
 int predict( double dt, struct madqg_state *state )
@@ -196,8 +211,11 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
     // approximate E.E. pose in body frame from kinematics alone
 
     // FIXME: buffer overflow
-    double cor_body[7*16];
-    double cor_cam[7*16];
+    /* double cor_body[7*16]; */
+    /* double cor_cam[7*16]; */
+
+    double z_cam[7*16];
+
     size_t i_cor = 0;
 
     double l_p[7*16];
@@ -207,6 +225,12 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
     size_t i_rp = 0;
 
     double *bEc = state_bEc[i_cam].E;
+
+    double *bEwl = AA_MATCOL( tf_abs, 7, PIR_TF_LEFT_WRIST2 );
+    double *bEwr = AA_MATCOL( tf_abs, 7, PIR_TF_RIGHT_WRIST2 );
+
+    /* double *rElp = state_lElp.E; */
+    /* double *rErp = state_rErp.E; */
 
     // TODO: E.E. relative
     for( size_t j = 0; j < wt_tf->header.n; j ++ ) {
@@ -219,17 +243,22 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
             ssize_t side = frame_side(frame);
             assert( PIR_LEFT == side || PIR_RIGHT == side );
 
-            // find wrist to marker
-            double *bEw = AA_MATCOL(tf_abs, 7, ((PIR_LEFT==side) ? PIR_TF_LEFT_WRIST2 : PIR_TF_RIGHT_WRIST2) );
+            /* // find wrist to marker */
+            double *bEw = (PIR_LEFT==side) ? bEwl : bEwr ;
             double wEm[7]; aa_tf_qutr_cmul( bEw, bEm, wEm );
 
+            {
+                //double e0[7];
+                aa_tf_qutr_mulc( bEm, cEm, &z_cam[7*i_cor++] );
+            }
+
             // for camera update
-            AA_MEM_CPY( AA_MATCOL(cor_body, 7, i_cor), bEm, 7 );
-            AA_MEM_CPY( AA_MATCOL(cor_cam, 7, i_cor), cEm, 7 );
-            i_cor++;
+            /* AA_MEM_CPY( AA_MATCOL(cor_body, 7, i_cor), bEm, 7 ); */
+            /* AA_MEM_CPY( AA_MATCOL(cor_cam, 7, i_cor), cEm, 7 ); */
+            /* i_cor++; */
 
             // for E.E update
-            // find wrist to wrist'
+            /* // find wrist to wrist' */
             double e0[7], e1[7];
             aa_tf_qutr_cmul( bEw, bEc, e0 );
             aa_tf_qutr_mul( e0, cEm, e1 );
@@ -238,26 +267,37 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
                 aa_tf_qutr_mulc( e1, wEm, AA_MATCOL(l_p,7,i_lp++) );
             else
                 aa_tf_qutr_mulc( e1, wEm, AA_MATCOL(r_p,7,i_rp++) );
-
-
         } else {
             /**** FIXED MARKERS ****/
             for( size_t k = 0; k < opt_n_fixed_markers; k ++ ) {
-                if( opt_fixed_markers[k] == j ) {
+                if( opt_fixed_markers[k] == j &&
+                    (state_bEc[i_cam].n == state_bEc[i_cam].max ||
+                     state_bEm[k].n == state_bEm[k].max )
+                    ) {
                     // found kth marker
                     // use as a correspondance
-                    AA_MEM_CPY( cor_body+7*i_cor, state_bEm[k].E, 7 );
-                    AA_MEM_CPY( cor_cam+7*i_cor, wt_tf->wt_tf[j].tf.data, 7 );
-                    i_cor++;
+                    /* AA_MEM_CPY( cor_body+7*i_cor, state_bEm[k].E, 7 ); */
+                    /* AA_MEM_CPY( cor_cam+7*i_cor, wt_tf->wt_tf[j].tf.data, 7 ); */
+                    /* i_cor++; */
+                    aa_tf_qutr_mulc(  state_bEm[k].E, cEm, &z_cam[7*i_cor++] );
+
                     double E_obs[7];
                     aa_tf_qutr_mul( bEc, cEm, E_obs );
-                    correct1( &state_bEm[k], E_obs );
+                    correct1( &state_bEm[k], E_obs, 1 );
                 }
             }
         }
     }
+    //aa_dump_mat( stdout, z_cam, 7, i_cor );
     /* Correct Camera */
-    correct2( state_bEc+i_cam, i_cor, cor_body, cor_cam );
+    //correct2( state_bEc+i_cam, i_cor, cor_body, cor_cam );
+    if( i_cor ) correct1( state_bEc+i_cam, z_cam, i_cor );
+    //correct( state_bEc+i_cam, i_cor, cor_body, cor_cam );
+    /* Correct wrist offsets */
+    /* if( i_lp ) correct1( &state_lElp, l_p, i_lp ); */
+    if( i_rp ) correct1( &state_rErp, r_p, i_rp );
+    printf("lp: "); aa_dump_vec(stdout, state_lElp.E, 7 );
+    printf("rp: "); aa_dump_vec(stdout, state_rErp.E, 7 );
 }
 
 void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
@@ -292,8 +332,6 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
                          frame_size, expected_size );
             pir_tf_rel( config, state_tf_rel );
             pir_tf_abs( state_tf_rel, state_tf_abs );
-            AA_MEM_CPY( state_bEl.E, state_tf_abs+7*PIR_TF_LEFT_WRIST0,7 );
-            AA_MEM_CPY( state_bEr.E, state_tf_abs+7*PIR_TF_LEFT_WRIST0,7 );
         }
     }
 
@@ -306,10 +344,8 @@ void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
     for( size_t i = 0; i < opt_n_fixed_markers; i ++ ) {
         predict( dt, state_bEm );
     }
-    predict( dt, &state_bEr );
-    predict( dt, &state_bEl );
-    /* predict( dt, &state_rErp ); */
-    /* predict( dt, &state_lElp ); */
+    predict( dt, &state_rErp );
+    predict( dt, &state_lElp );
 
     /**** CAMERAS ****/
     SNS_LOG( LOG_DEBUG + 2, "update(): cam\n");
@@ -366,6 +402,18 @@ int output( ach_channel_t *chan_reg_cam, ach_channel_t *chan_reg_marker, ach_cha
 
     output_chan( now, chan_reg_cam, state_bEc, opt_n_cam );
     if( opt_n_fixed_markers ) output_chan( now, chan_reg_marker, state_bEm, opt_n_fixed_markers );
+
+
+    {
+        struct sns_msg_tf *msg = sns_msg_tf_local_alloc( (uint32_t) 2 );
+        sns_msg_set_time( &msg->header, &now, 0 );
+        AA_MEM_CPY( msg->tf[0].data, state_lElp.E, 7 );
+        AA_MEM_CPY( msg->tf[1].data, state_rErp.E, 7 );
+
+        enum ach_status r = sns_msg_tf_put(chan_reg_ee, msg);
+        SNS_REQUIRE( ACH_OK == r, "Couldn't put message\n");
+    }
+
     //output_chan( now, chan_reg_e, state_bEc, opt_n_fixed_markers );
 
     /* struct sns_msg_tf *tf_cam = sns_msg_tf_local_alloc( (uint32_t) opt_n_cam ); */
@@ -436,6 +484,7 @@ int main( int argc, char **argv )
         SNS_LOG( LOG_DEBUG, "fixed marker %lu: %lu\n",
                  i, opt_fixed_markers[i] );
     }
+    SNS_LOG( LOG_DEBUG, "%lu median window\n", opt_k);
     SNS_LOG( LOG_DEBUG, "%lu cameras\n", opt_n_cam);
     SNS_LOG( LOG_DEBUG, "%lu fixed markers\n", opt_n_fixed_markers);
 
@@ -466,14 +515,12 @@ int main( int argc, char **argv )
     for( size_t i = 0; i < opt_n_fixed_markers; i ++ ) {
         init_state( &state_bEm[i], opt_k );
     }
-    init_state( &state_bEl, opt_k );
-    init_state( &state_bEr, opt_k );
     init_state( &state_lElp, opt_k );
     init_state( &state_rErp, opt_k );
 
     // FIXME: dt
-    aa_la_diag( 7, Wb, .01 );
-    aa_la_diag( 13, Pb, 1 );
+    aa_la_diag( 7, Wb, .1 );
+    aa_la_diag( 13, Pb, 10 );
 
     SNS_LOG( LOG_INFO, "starting main loop\n");
     // run
