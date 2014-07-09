@@ -245,28 +245,35 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
 
             /* // find wrist to marker */
             double *bEw = (PIR_LEFT==side) ? bEwl : bEwr ;
+            double *wEwp = (PIR_LEFT==side) ? state_lElp.E : state_rErp.E ;
             double wEm[7]; aa_tf_qutr_cmul( bEw, bEm, wEm );
 
             {
-                //double e0[7];
-                aa_tf_qutr_mulc( bEm, cEm, &z_cam[7*i_cor++] );
+                double bEwp[7];
+
+                /* double I[7] = AA_TF_QUTR_IDENT_INITIALIZER; */
+                /* aa_tf_qutr_mul( bEw, I, bEwp ); */
+                aa_tf_qutr_mul( bEw, wEwp, bEwp );
+
+                double bEmp[7];
+                aa_tf_qutr_mul( bEwp, wEm, bEmp );
+
+                aa_tf_qutr_mulc( bEmp, cEm, &z_cam[7*i_cor++] );
             }
 
-            // for camera update
-            /* AA_MEM_CPY( AA_MATCOL(cor_body, 7, i_cor), bEm, 7 ); */
-            /* AA_MEM_CPY( AA_MATCOL(cor_cam, 7, i_cor), cEm, 7 ); */
-            /* i_cor++; */
-
-            // for E.E update
-            /* // find wrist to wrist' */
-            double e0[7], e1[7];
-            aa_tf_qutr_cmul( bEw, bEc, e0 );
-            aa_tf_qutr_mul( e0, cEm, e1 );
-            // add to wrist updater
-            if( PIR_LEFT == side )
-                aa_tf_qutr_mulc( e1, wEm, AA_MATCOL(l_p,7,i_lp++) );
-            else
-                aa_tf_qutr_mulc( e1, wEm, AA_MATCOL(r_p,7,i_rp++) );
+            if(state_bEc[i_cam].n == state_bEc[i_cam].max ) {
+                // for E.E update
+                // find wrist to wrist'
+                double e0[7], e1[7];
+                aa_tf_qutr_cmul( bEw, bEc, e0 );
+                aa_tf_qutr_mul( e0, cEm, e1 );
+                // add to wrist updater
+                if( PIR_LEFT == side ) {
+                    aa_tf_qutr_mulc( e1, wEm, AA_MATCOL(l_p,7,i_lp++) );
+                } else {
+                    aa_tf_qutr_mulc( e1, wEm, AA_MATCOL(r_p,7,i_rp++) );
+                }
+            }
         } else {
             /**** FIXED MARKERS ****/
             for( size_t k = 0; k < opt_n_fixed_markers; k ++ ) {
@@ -276,9 +283,6 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
                     ) {
                     // found kth marker
                     // use as a correspondance
-                    /* AA_MEM_CPY( cor_body+7*i_cor, state_bEm[k].E, 7 ); */
-                    /* AA_MEM_CPY( cor_cam+7*i_cor, wt_tf->wt_tf[j].tf.data, 7 ); */
-                    /* i_cor++; */
                     aa_tf_qutr_mulc(  state_bEm[k].E, cEm, &z_cam[7*i_cor++] );
 
                     double E_obs[7];
@@ -294,10 +298,8 @@ void update_camera( double *tf_abs, size_t i_cam, struct sns_msg_wt_tf *wt_tf )
     if( i_cor ) correct1( state_bEc+i_cam, z_cam, i_cor );
     //correct( state_bEc+i_cam, i_cor, cor_body, cor_cam );
     /* Correct wrist offsets */
-    /* if( i_lp ) correct1( &state_lElp, l_p, i_lp ); */
+    if( i_lp ) correct1( &state_lElp, l_p, i_lp );
     if( i_rp ) correct1( &state_rErp, r_p, i_rp );
-    printf("lp: "); aa_dump_vec(stdout, state_lElp.E, 7 );
-    printf("rp: "); aa_dump_vec(stdout, state_rErp.E, 7 );
 }
 
 void update( ach_channel_t *chan_config, ach_channel_t *chan_cam, size_t n_cam )
