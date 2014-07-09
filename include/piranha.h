@@ -349,6 +349,14 @@ int set_mode_servo_cam(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 void ctrl_servo_cam( pirctrl_cx_t *cx );
 
 
+struct biservo_rel_cx {
+    double rElt[7];
+    double b_q_lt[4];
+};
+int set_mode_biservo_rel(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void ctrl_biservo_rel( pirctrl_cx_t *cx );
+
+
 int sdh_pinch_left( pirctrl_cx_t *cx, struct pir_msg * );
 int sdh_pinch_right( pirctrl_cx_t *cx, struct pir_msg * );
 int sdh_set_left( pirctrl_cx_t *cx, struct pir_msg * );

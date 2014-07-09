@@ -94,6 +94,60 @@ static void servo_cam( pirctrl_cx_t *cx, struct servo_cam_cx *mode_cx )
     //printf("--\n");
 }
 
+
+void ctrl_biservo_rel( pirctrl_cx_t *cx )
+{
+    struct biservo_rel_cx *mode_cx = (struct biservo_rel_cx *)cx->mode_cx;
+    // fixup end-effector pose
+    double bElwp[7], bErwp[7];
+    aa_tf_qutr_mul( AA_MATCOL(cx->tf_abs, 7, PIR_TF_LEFT_WRIST2 ),
+                    cx->lElp, bElwp );
+    aa_tf_qutr_mul( AA_MATCOL(cx->tf_abs, 7, PIR_TF_RIGHT_WRIST2 ),
+                    cx->rErp, bErwp );
+
+    // rel ef:  bEe = bEw * wEe => wEe = conj(bEw) * bEe
+    double rwEre[7], lwEle[7];
+    aa_tf_qutr_cmul( AA_MATCOL(cx->tf_abs, 7, PIR_TF_RIGHT_WRIST2),
+                     AA_MATCOL(cx->tf_abs, 7, PIR_TF_RIGHT_SDH_FINGERTIP),
+                     rwEre );
+    aa_tf_qutr_cmul( AA_MATCOL(cx->tf_abs, 7, PIR_TF_LEFT_WRIST2),
+                     AA_MATCOL(cx->tf_abs, 7, PIR_TF_LEFT_SDH_FINGERTIP),
+                     lwEle );
+
+
+    // compute target pose
+    double bErep[7], bElep[7], bElwtp[7];
+
+    aa_tf_qutr_mul( bErwp, rwEre, bErep );
+    aa_tf_qutr_mul( bErep, mode_cx->rElt, bElep );
+
+    if( aa_tf_qnorm(mode_cx->b_q_lt) > 0 ) {
+        //printf("copy quat\n");
+        AA_MEM_CPY( bElep, mode_cx->b_q_lt, 4 );
+    }
+    aa_tf_qutr_mulc( bElep, lwEle, bElwtp );
+
+    //double Et[7];
+    //aa_tf_qutr_mulc( bElwtp, cx->lElp, Et );
+
+    // fill controller
+    rfx_ctrl_ws_t *G = &cx->G[PIR_LEFT];
+    aa_tf_qutr2duqu( bElwtp, G->ref.S );
+    aa_tf_qutr2duqu( bElwp, G->act.S );
+    AA_MEM_ZERO( G->ref.dx, 6 );
+
+    //printf("act: "); aa_dump_vec( stdout, bElwp, 7 );
+    //printf("ref: "); aa_dump_vec( stdout, bElwtp, 7 );
+
+    int r = rfx_ctrl_ws_lin_vfwd( G, &cx->Kx, &cx->ref.dq[PIR_AXIS_L0] );
+    if( RFX_OK != r ) {
+        SNS_LOG( LOG_ERR, "ws error: %s\n",
+                 rfx_status_string((rfx_status_t)r) );
+    }
+    //printf("--\n");
+}
+
+
 void ctrl_servo_cam( pirctrl_cx_t *cx )
 {
     servo_cam(cx, (struct servo_cam_cx*)cx->mode_cx);
