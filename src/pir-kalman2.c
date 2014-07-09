@@ -409,8 +409,8 @@ int output( ach_channel_t *chan_reg_cam, ach_channel_t *chan_reg_marker, ach_cha
     {
         struct sns_msg_tf *msg = sns_msg_tf_local_alloc( (uint32_t) 2 );
         sns_msg_set_time( &msg->header, &now, 0 );
-        AA_MEM_CPY( msg->tf[0].data, state_lElp.E, 7 );
-        AA_MEM_CPY( msg->tf[1].data, state_rErp.E, 7 );
+        AA_MEM_CPY( msg->tf[PIR_LEFT].data, state_lElp.E, 7 );
+        AA_MEM_CPY( msg->tf[PIR_RIGHT].data, state_rErp.E, 7 );
 
         enum ach_status r = sns_msg_tf_put(chan_reg_ee, msg);
         SNS_REQUIRE( ACH_OK == r, "Couldn't put message\n");

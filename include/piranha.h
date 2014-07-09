@@ -228,6 +228,9 @@ typedef struct {
     ach_channel_t chan_config;
     ach_channel_t chan_reg;
 
+    ach_channel_t chan_reg_cam;
+    ach_channel_t chan_reg_ee;
+
     ach_channel_t chan_sdhref_left;
     ach_channel_t chan_sdhref_right;
 
@@ -247,6 +250,12 @@ typedef struct {
     double *tf_rel;
     double *tf_abs;
     double bEc[7];
+
+    double *bEc2;
+    size_t n_bEc2;
+
+    double lElp[7];
+    double rErp[7];
 
     struct pir_mode_desc *mode;
     void *mode_cx;

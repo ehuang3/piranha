@@ -207,9 +207,11 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_sdhref_left,  "sdhref-left",  NULL );
     sns_chan_open( &cx.chan_sdhref_right, "sdhref-right", NULL );
     sns_chan_open( &cx.chan_state_pir,    "pir-state",    NULL );
-    sns_chan_open( &cx.chan_config,       "pir-config",    NULL );
-    sns_chan_open( &cx.chan_reg,          "pir-reg",    NULL );
-    sns_chan_open( &cx.chan_complete,     "pir-complete",    NULL );
+    sns_chan_open( &cx.chan_config,       "pir-config",   NULL );
+    sns_chan_open( &cx.chan_reg,          "pir-reg",      NULL );
+    sns_chan_open( &cx.chan_reg_cam,      "pir-reg-cam",  NULL );
+    sns_chan_open( &cx.chan_reg_ee,       "pir-reg-ee",   NULL );
+    sns_chan_open( &cx.chan_complete,     "pir-complete", NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_pir, &cx.chan_js, NULL};
         sns_sigcancel( chans, sns_sig_term_default );
@@ -412,6 +414,51 @@ static void update(void) {
                 }
             } else {
                 SNS_LOG(LOG_ERR, "Invalid registration size\n");
+            }
+            break;
+        CASE_NO_MSG: break;
+        default:
+            SNS_LOG(LOG_ERR, "Failed to get frame: %s\n", ach_result_to_string(r) );
+        }
+    }
+    // registration 2
+    {
+        size_t frame_size;
+        struct sns_msg_tf *msg;
+        enum ach_status r = sns_msg_tf_local_get( &cx.chan_reg_cam, &msg, &frame_size, NULL, ACH_O_LAST );
+        switch(r) {
+        CASE_HAVE_MSG:
+            if( 0 == sns_msg_tf_check_size(msg,frame_size) ) {
+                if( msg->header.n != cx.n_bEc2 ) {
+                    cx.bEc2 = (double*)realloc( cx.bEc2, sizeof(cx.bEc2[0]) * 7 * msg->header.n );
+                    cx.n_bEc2 = msg->header.n;
+                }
+                AA_MEM_CPY( cx.bEc2, msg->tf[0].data, 7 * cx.n_bEc2 );
+            } else {
+                SNS_LOG(LOG_ERR, "Invalid msg size\n");
+            }
+            break;
+        CASE_NO_MSG: break;
+        default:
+            SNS_LOG(LOG_ERR, "Failed to get frame: %s\n", ach_result_to_string(r) );
+        }
+    }
+    // EE offset
+    {
+        size_t frame_size;
+        struct sns_msg_tf *msg;
+        enum ach_status r = sns_msg_tf_local_get( &cx.chan_reg_ee, &msg, &frame_size, NULL, ACH_O_LAST );
+        switch(r) {
+        CASE_HAVE_MSG:
+            if( 0 == sns_msg_tf_check_size(msg,frame_size) ) {
+                if( 2 == msg->header.n ) {
+                    AA_MEM_CPY( cx.lElp, msg->tf[PIR_LEFT].data, 7 );
+                    AA_MEM_CPY( cx.rErp, msg->tf[PIR_RIGHT].data, 7 );
+                } else {
+                    SNS_LOG(LOG_ERR, "Unexpected EE offset registration count\n");
+                }
+            } else {
+                SNS_LOG(LOG_ERR, "Invalid msg size\n");
             }
             break;
         CASE_NO_MSG: break;
