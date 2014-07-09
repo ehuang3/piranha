@@ -317,7 +317,7 @@ int output( ach_channel_t *chan_reg_cam, ach_channel_t *chan_reg_marker, ach_cha
     SNS_LOG( LOG_DEBUG+2, "output()\n");
 
     output_chan( now, chan_reg_cam, state_bEc, opt_n_cam );
-    output_chan( now, chan_reg_marker, state_bEc, opt_n_fixed_markers );
+    if( opt_n_fixed_markers ) output_chan( now, chan_reg_marker, state_bEc, opt_n_fixed_markers );
     //output_chan( now, chan_reg_e, state_bEc, opt_n_fixed_markers );
 
     /* struct sns_msg_tf *tf_cam = sns_msg_tf_local_alloc( (uint32_t) opt_n_cam ); */
@@ -344,7 +344,7 @@ int main( int argc, char **argv )
 {
     sns_init();
     /* Parse */
-    for( int c; -1 != (c = getopt(argc, argv, "?k:c:" SNS_OPTSTRING )); ) {
+    for( int c; -1 != (c = getopt(argc, argv, "?k:c:m:" SNS_OPTSTRING )); ) {
         switch(c) {
             SNS_OPTCASES
         case 'k':
@@ -353,6 +353,11 @@ int main( int argc, char **argv )
         case 'c':
             opt_cam = (char**)realloc( opt_cam, (sizeof(char*)) * ++opt_n_cam );
             opt_cam[opt_n_cam-1] = optarg;
+            break;
+        case 'm':
+            opt_fixed_markers = (size_t*)realloc( opt_fixed_markers,
+                                                  (sizeof(opt_fixed_markers[0])) * ++opt_n_fixed_markers );
+            opt_fixed_markers[opt_n_fixed_markers-1] = (size_t)atoi(optarg);
             break;
         case '?':   /* help     */
             puts( "Usage: pir-kalman\n"
@@ -378,6 +383,10 @@ int main( int argc, char **argv )
     for( size_t i = 0; i < opt_n_cam; i ++ ) {
         SNS_LOG( LOG_DEBUG, "marker channel %lu: %s\n",
                  i, opt_cam[i] );
+    }
+    for( size_t i = 0; i < opt_n_fixed_markers; i ++ ) {
+        SNS_LOG( LOG_DEBUG, "fixed marker %lu: %lu\n",
+                 i, opt_fixed_markers[i] );
     }
     SNS_LOG( LOG_DEBUG, "%lu cameras\n", opt_n_cam);
     SNS_LOG( LOG_DEBUG, "%lu fixed markers\n", opt_n_fixed_markers);
@@ -415,8 +424,8 @@ int main( int argc, char **argv )
     init_state( &state_rErp, opt_k );
 
     // FIXME: dt
-    aa_la_diag( 7, Wb, .5 );
-    aa_la_diag( 13, Pb, 10 );
+    aa_la_diag( 7, Wb, .01 );
+    aa_la_diag( 13, Pb, 1 );
 
     SNS_LOG( LOG_INFO, "starting main loop\n");
     // run
