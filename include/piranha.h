@@ -228,6 +228,9 @@ typedef struct {
     ach_channel_t chan_config;
     ach_channel_t chan_reg;
 
+    ach_channel_t chan_reg_cam;
+    ach_channel_t chan_reg_ee;
+
     ach_channel_t chan_sdhref_left;
     ach_channel_t chan_sdhref_right;
 
@@ -247,6 +250,12 @@ typedef struct {
     double *tf_rel;
     double *tf_abs;
     double bEc[7];
+
+    double *bEc2;
+    size_t n_bEc2;
+
+    double lElp[7];
+    double rErp[7];
 
     struct pir_mode_desc *mode;
     void *mode_cx;
@@ -338,6 +347,14 @@ struct servo_cam_cx {
 };
 int set_mode_servo_cam(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 void ctrl_servo_cam( pirctrl_cx_t *cx );
+
+
+struct biservo_rel_cx {
+    double rElt[7];
+    double b_q_lt[4];
+};
+int set_mode_biservo_rel(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void ctrl_biservo_rel( pirctrl_cx_t *cx );
 
 
 int sdh_pinch_left( pirctrl_cx_t *cx, struct pir_msg * );

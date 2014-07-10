@@ -282,3 +282,17 @@ int set_mode_servo_cam(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl )
 
     return 0;
 }
+
+int set_mode_biservo_rel(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
+    zero_refs(cx);
+    if( msg_ctrl->n*sizeof(double) != sizeof( struct biservo_rel_cx) ) return -1;
+
+    // free old stuff
+    aa_mem_region_release( &cx->modereg );
+
+    // copy target pose
+    cx->mode_cx = aa_mem_region_dup( &cx->modereg,
+                                     &msg_ctrl->x[0].f, sizeof(struct biservo_rel_cx) );
+
+    return 0;
+}

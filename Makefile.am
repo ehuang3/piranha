@@ -44,6 +44,10 @@ bin_PROGRAMS += pir-kalman
 pir_kalman_SOURCES = src/pir-kalman.c
 pir_kalman_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
 
+bin_PROGRAMS += pir-kalman2
+pir_kalman2_SOURCES = src/pir-kalman2.c
+pir_kalman2_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
+
 bin_PROGRAMS += pir-dump
 pir_dump_SOURCES = src/pir-dump.c
 pir_dump_LDADD = -lsns -lach -lamino -lblas -llapack libpiranha.la -lreflex libpiranha.la
@@ -59,9 +63,10 @@ pir-frame.h: pir-frame.c
 pir-frame.pdf: pir-frame.dot
 	dot pir-frame.dot -Tpdf > pir-frame.pdf
 
-kinematics.f: $(top_srcdir)/src/kinematics.mac
+tf.f kinematics.f: $(top_srcdir)/src/kinematics.mac
 	maxima --very-quiet -b $(top_srcdir)/src/kinematics.mac
 
+tf.f: kinematics.f
 
 noinst_PROGRAMS += iros2014
 iros2014_SOURCES = src/experiments/iros2014.c

@@ -149,6 +149,10 @@ struct pir_mode_desc mode_desc[] = {
      set_mode_servo_cam,
      ctrl_servo_cam,
      NULL},
+    {"biservo-rel",
+     set_mode_biservo_rel,
+     ctrl_biservo_rel,
+     NULL},
     {"sdh-set-left",
      sdh_set_left,
      NULL,
@@ -207,9 +211,11 @@ int main( int argc, char **argv ) {
     sns_chan_open( &cx.chan_sdhref_left,  "sdhref-left",  NULL );
     sns_chan_open( &cx.chan_sdhref_right, "sdhref-right", NULL );
     sns_chan_open( &cx.chan_state_pir,    "pir-state",    NULL );
-    sns_chan_open( &cx.chan_config,       "pir-config",    NULL );
-    sns_chan_open( &cx.chan_reg,          "pir-reg",    NULL );
-    sns_chan_open( &cx.chan_complete,     "pir-complete",    NULL );
+    sns_chan_open( &cx.chan_config,       "pir-config",   NULL );
+    sns_chan_open( &cx.chan_reg,          "pir-reg",      NULL );
+    sns_chan_open( &cx.chan_reg_cam,      "pir-reg-cam",  NULL );
+    sns_chan_open( &cx.chan_reg_ee,       "pir-reg-ee",   NULL );
+    sns_chan_open( &cx.chan_complete,     "pir-complete", NULL );
     {
         ach_channel_t *chans[] = {&cx.chan_state_pir, &cx.chan_js, NULL};
         sns_sigcancel( chans, sns_sig_term_default );
@@ -356,6 +362,16 @@ int main( int argc, char **argv ) {
     return 0;
 }
 
+#define CASE_HAVE_MSG        \
+    case ACH_OK: ;           \
+    case ACH_MISSED_FRAME    \
+
+
+#define CASE_NO_MSG          \
+    case ACH_CANCELED: ;     \
+    case ACH_STALE_FRAMES: ; \
+    case ACH_TIMEOUT         \
+
 static void update(void) {
     // config
     {
@@ -363,15 +379,11 @@ static void update(void) {
         ach_status_t r = ach_get( &cx.chan_config, &cx.config, sizeof(cx.config), &frame_size,
                                   NULL, ACH_O_LAST );
         switch(r) {
-        case ACH_OK:
-        case ACH_MISSED_FRAME:
+        CASE_HAVE_MSG:
             SNS_REQUIRE( frame_size == sizeof(cx.config), "Invalid config size: %lu\n", frame_size );
             pir_kin( cx.config.q, &cx.tf_rel, &cx.tf_abs );
             break;
-        case ACH_CANCELED:
-        case ACH_TIMEOUT:
-        case ACH_STALE_FRAMES:
-            break;
+        CASE_NO_MSG: break;
         default:
             SNS_LOG(LOG_ERR, "Failed to get config: %s\n", ach_result_to_string(r) );
         }
@@ -383,11 +395,8 @@ static void update(void) {
         ach_status_t r = ach_get( &cx.chan_state_pir, &cx.state, sizeof(cx.state), &frame_size,
                                   NULL, ACH_O_LAST );
         switch(r) {
-        case ACH_OK:
-        case ACH_MISSED_FRAME:
-        case ACH_CANCELED:
-        case ACH_TIMEOUT:
-        case ACH_STALE_FRAMES:
+        CASE_HAVE_MSG: break;
+        CASE_NO_MSG: break;
             break;
         default:
             SNS_LOG(LOG_ERR, "Failed to get frame: %s\n", ach_result_to_string(r) );
@@ -400,8 +409,7 @@ static void update(void) {
         struct sns_msg_tf *msg;
         enum ach_status r = sns_msg_tf_local_get( &cx.chan_reg, &msg, &frame_size, NULL, ACH_O_LAST );
         switch(r) {
-        case ACH_OK:
-        case ACH_MISSED_FRAME:
+        CASE_HAVE_MSG:
             if( 0 == sns_msg_tf_check_size(msg,frame_size) ) {
                 if( 2 == msg->header.n ) {
                     AA_MEM_CPY( cx.bEc, msg->tf[1].data, 7 );
@@ -412,15 +420,56 @@ static void update(void) {
                 SNS_LOG(LOG_ERR, "Invalid registration size\n");
             }
             break;
-        case ACH_CANCELED:
-        case ACH_TIMEOUT:
-        case ACH_STALE_FRAMES:
-            break;
+        CASE_NO_MSG: break;
         default:
             SNS_LOG(LOG_ERR, "Failed to get frame: %s\n", ach_result_to_string(r) );
         }
     }
-
+    // registration 2
+    {
+        size_t frame_size;
+        struct sns_msg_tf *msg;
+        enum ach_status r = sns_msg_tf_local_get( &cx.chan_reg_cam, &msg, &frame_size, NULL, ACH_O_LAST );
+        switch(r) {
+        CASE_HAVE_MSG:
+            if( 0 == sns_msg_tf_check_size(msg,frame_size) ) {
+                if( msg->header.n != cx.n_bEc2 ) {
+                    cx.bEc2 = (double*)realloc( cx.bEc2, sizeof(cx.bEc2[0]) * 7 * msg->header.n );
+                    cx.n_bEc2 = msg->header.n;
+                }
+                AA_MEM_CPY( cx.bEc2, msg->tf[0].data, 7 * cx.n_bEc2 );
+            } else {
+                SNS_LOG(LOG_ERR, "Invalid msg size\n");
+            }
+            break;
+        CASE_NO_MSG: break;
+        default:
+            SNS_LOG(LOG_ERR, "Failed to get frame: %s\n", ach_result_to_string(r) );
+        }
+    }
+    // EE offset
+    {
+        size_t frame_size;
+        struct sns_msg_tf *msg;
+        enum ach_status r = sns_msg_tf_local_get( &cx.chan_reg_ee, &msg, &frame_size, NULL, ACH_O_LAST );
+        switch(r) {
+        CASE_HAVE_MSG:
+            if( 0 == sns_msg_tf_check_size(msg,frame_size) ) {
+                if( 2 == msg->header.n ) {
+                    AA_MEM_CPY( cx.lElp, msg->tf[PIR_LEFT].data, 7 );
+                    AA_MEM_CPY( cx.rErp, msg->tf[PIR_RIGHT].data, 7 );
+                } else {
+                    SNS_LOG(LOG_ERR, "Unexpected EE offset registration count\n");
+                }
+            } else {
+                SNS_LOG(LOG_ERR, "Invalid msg size\n");
+            }
+            break;
+        CASE_NO_MSG: break;
+        default:
+            SNS_LOG(LOG_ERR, "Failed to get frame: %s\n", ach_result_to_string(r) );
+        }
+    }
 
     // joystick
     {
@@ -432,8 +481,7 @@ static void update(void) {
 
         // validate
         switch(r) {
-        case ACH_OK:
-        case ACH_MISSED_FRAME:
+        CASE_HAVE_MSG:
             if( msg->header.n == JS_AXES &&
                 frame_size == sns_msg_joystick_size(msg) )
             {
@@ -450,10 +498,7 @@ static void update(void) {
                 }
             }
         break;
-        case ACH_STALE_FRAMES:
-        case ACH_TIMEOUT:
-        case ACH_CANCELED:
-            break;
+        CASE_NO_MSG: break;
         default:
             SNS_LOG(LOG_ERR, "Error getting joystick message\n");
         }

@@ -19,6 +19,30 @@ Force/Torque Sensors
 * Workaround: set node id to 0x27, so we only conflict with CANopen
   nodes > 0x70
 
+
+COMPUTERS
+=========
+
+Calvin
+------
+Robot control PC.
+
+No getty runs on the Linux virtual terminals.  Gettys run on the
+serial console.  Connect from talos with: `screen /dev/ttyS0 38400`
+
+Talos
+-----
+Console machine for calvin.
+
+Zhaan
+-----
+Vision processing PC.
+
+thebrain
+-------
+Manages home directories and logins for other computers.
+
+
 TROUBLESHOOTING
 ===============
 

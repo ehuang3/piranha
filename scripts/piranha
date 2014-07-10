@@ -91,6 +91,24 @@ pir_start() {
         sdhiod -b $CAN_SDH_R -c sdhref-right -s sdhstate-right
 }
 
+pir_expunge() {
+    sudo rm -rf /var/tmp/sns/lwa-left
+    sudo rm -rf /var/tmp/sns/lwa-right
+    sudo rm -rf /var/tmp/sns/torso
+    sudo rm -rf /var/tmp/sns/ft-left
+    sudo rm -rf /var/tmp/sns/ft-right
+    sudo rm -rf /var/tmp/sns/sdh-left
+    sudo rm -rf /var/tmp/sns/sdh-right
+
+    sudo rm -rf /var/run/sns/lwa-left
+    sudo rm -rf /var/run/sns/lwa-right
+    sudo rm -rf /var/run/sns/torso
+    sudo rm -rf /var/run/sns/ft-left
+    sudo rm -rf /var/run/sns/ft-right
+    sudo rm -rf /var/run/sns/sdh-left
+    sudo rm -rf /var/run/sns/sdh-right
+}
+
 pir_stop() {
     $SNS kill lwa-left
     $SNS kill lwa-right
@@ -134,6 +152,8 @@ case "$1" in
    steal)
 	shift
         pir_steal $@
+    expunge)
+        pir_expunge
         ;;
     *)
         echo "Invalid command"

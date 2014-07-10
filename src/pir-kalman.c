@@ -57,10 +57,16 @@ size_t opt_k = 1;
 
 #define N_MAX 8
 
-#define MK0 (32+5)
-#define MK1 (32+7)
-#define MK2 (32+8)
-#define MK3 (32+2)
+//#define MK0 (32+5)
+//#define MK1 (32+7)
+//#define MK2 (32+8)
+//#define MK3 (32+2)
+
+
+#define MK_R_L0M 2
+#define MK_R_L1M 1
+#define MK_R_R0P 8
+#define MK_R_R1P 3
 
 //TODO: no copy paste
 int marker2frame( size_t marker_id ) {
@@ -70,10 +76,10 @@ int marker2frame( size_t marker_id ) {
     /* case 8:  return PIR_TF_RIGHT_SDH_R_K0P; */
     /* case 2:  return PIR_TF_RIGHT_SDH_R_K1P; */
 
-    case MK0:  return PIR_TF_RIGHT_SDH_L_K0M;
-    case MK1:  return PIR_TF_RIGHT_SDH_L_K1M;
-    case MK2:  return PIR_TF_RIGHT_SDH_R_K0P;
-    case MK3:  return PIR_TF_RIGHT_SDH_R_K1P;
+    case MK_R_L0M:  return PIR_TF_RIGHT_SDH_L_K0M;
+    case MK_R_L1M:  return PIR_TF_RIGHT_SDH_L_K1M;
+    case MK_R_R0P:  return PIR_TF_RIGHT_SDH_R_K0P;
+    case MK_R_R1P:  return PIR_TF_RIGHT_SDH_R_K1P;
 
         // TODO: find correspondences
     /*     /\* Left *\/ */
@@ -222,7 +228,7 @@ int main( int argc, char **argv )
     // init
     ach_channel_t chan_config, chan_marker, chan_reg, chan_reg_rec;
     sns_chan_open( &chan_config, "pir-config", NULL );
-    sns_chan_open( &chan_marker, "pir-marker", NULL );
+    sns_chan_open( &chan_marker, "markers", NULL );
     sns_chan_open( &chan_reg, "pir-reg", NULL );
     sns_chan_open( &chan_reg_rec, "pir-reg-rec", NULL );
     {
@@ -319,7 +325,7 @@ int main( int argc, char **argv )
             struct timespec now;
             clock_gettime( ACH_DEFAULT_CLOCK, &now );
             sns_msg_set_time( &tfmsg->header, &now, 0 );
-            size_t j[4] = {MK0, MK1, MK2, MK3};
+            size_t j[4] = {MK_R_L0M, MK_R_L1M, MK_R_R0P, MK_R_R1P};
             for( size_t i = 0; i < 4; i ++ ) {
                 size_t frame = (size_t)marker2frame(j[i]);
                 aa_tf_qutr_mulc( AA_MATCOL(tf_abs,7,frame),
