@@ -54,6 +54,12 @@
    '(0.814484 -0.473742 0.796809 -0.473742 0.796809 -0.473742 0.796809)
    '(0.814484 -0.359367 0.911184 -0.443117 0.827434 -0.386555 0.883996)))
 
+(defparameter *grasp-clutch-1*
+  (ana-grasp
+   '(0.0669456 0.109431 0.0557195 0.0262162 -0.667703 0.728865 -0.149135)
+   '(0.719672 -0.586089 0.890811 -0.586089 0.890811 -0.586089 0.890811)
+   '(0.719672 -0.507964 0.968936 -0.438276 1.03862 -0.450776 1.02612)))
+
 (defun pir-go-cam (side x)
   (pir-go-1 side (quaternion-translation-2 +r-down+ (aa:transform *body-e-cam* x))))
 
@@ -73,6 +79,9 @@
                      (trajx-point (g* (trajx-point-pose p) (aa::inverse +wrist-e-sdh+))
                                   (trajx-point-time p)))))
     (pir-go :right points :point :wrist)))
+
+(defun grasp-target (grasp &key (cam-e-obj *cam-e-obj*))
+  (aa::g-chain  *body-e-cam* cam-e-obj (simple-grasp-pose grasp)))
 
 (defun grasp-it (grasp &key (cam-e-obj *cam-e-obj*))
   (pir-sdh-set :right (simple-grasp-q0 grasp))
