@@ -8,7 +8,7 @@ noinst_PROGRAMS = pirtest testkin
 pirdump_SOURCES = src/pirdump.c
 pirdump_LDADD = -lsns -lach  -lreflex -lamino -lblas -llapack
 
-pirctrl_SOURCES = src/pirctrl.c src/setmode.c src/sdh.c src/ctrl.c
+pirctrl_SOURCES = src/pirctrl.c src/setmode.c src/sdh.c src/ctrl.c src/mode/bisplend.cpp
 pirctrl_LDADD = libpiranha.la -lsns -lach -lreflex -lamino -llapack -lblas
 
 lib_LTLIBRARIES = libpiranha.la

@@ -281,6 +281,10 @@ typedef struct {
 
 } pirctrl_cx_t;
 
+static inline double *pir_tfa( pirctrl_cx_t *cx, size_t i ) {
+    return AA_MATCOL(cx->tf_abs, 7, i );
+}
+
 /*------ MODES --------*/
 typedef void (*pir_mode_run_fun_t)( pirctrl_cx_t *);
 typedef int (*pir_mode_init_fun_t)(pirctrl_cx_t *, struct pir_msg *);
@@ -297,6 +301,8 @@ struct pir_mode_desc {
 /*     struct pir_mode_desc *desc; */
 /*     // more data */
 /* } */
+
+void pir_zero_refs(pirctrl_cx_t *cx);
 
 int set_mode_k_s2min(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
 int set_mode_k_pt(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
@@ -361,6 +367,7 @@ int sdh_pinch_left( pirctrl_cx_t *cx, struct pir_msg * );
 int sdh_pinch_right( pirctrl_cx_t *cx, struct pir_msg * );
 int sdh_set_left( pirctrl_cx_t *cx, struct pir_msg * );
 int sdh_set_right( pirctrl_cx_t *cx, struct pir_msg * );
+
 
 #ifdef __cplusplus
 }

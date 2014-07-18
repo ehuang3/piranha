@@ -54,7 +54,7 @@
 #include <reflex.h>
 #include "piranha.h"
 
-static void zero_refs(pirctrl_cx_t *cx) {
+void pir_zero_refs(pirctrl_cx_t *cx) {
     for( int side = 0; side < 2; side++ ) {
         AA_MEM_CPY( cx->G[side].ref.S, cx->state.S_wp[side], 8 );
         AA_MEM_SET( cx->G[side].ref.q,  0, cx->G[side].n_q );
@@ -114,28 +114,28 @@ int set_mode_cpy(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 }
 
 int set_mode_ws_left(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    zero_refs(cx);
+    pir_zero_refs(cx);
     set_mode_cpy(cx,msg_ctrl);
     return 0;
 }
 
 
 int set_mode_ws_left_finger(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    zero_refs(cx);
+    pir_zero_refs(cx);
     aa_tf_duqu_smul( cx->state.S_wp[PIR_LEFT], cx->state.S_eer[PIR_LEFT], cx->G[PIR_LEFT].ref.S );
     set_mode_cpy(cx,msg_ctrl);
     return 0;
 }
 
 int set_mode_ws_right_finger(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    zero_refs(cx);
+    pir_zero_refs(cx);
     aa_tf_duqu_smul( cx->state.S_wp[PIR_RIGHT], cx->state.S_eer[PIR_RIGHT], cx->G[PIR_RIGHT].ref.S );
     set_mode_cpy(cx,msg_ctrl);
     return 0;
 }
 
 int set_mode_ws_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    zero_refs(cx);
+    pir_zero_refs(cx);
     set_mode_cpy(cx,msg_ctrl);
     return 0;
 }
@@ -148,7 +148,7 @@ int set_mode_sin(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 
 int set_mode_trajx_side(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double S0[8] ) {
     if( msg_ctrl->n < 9 ) return -1;
-    zero_refs(cx);
+    pir_zero_refs(cx);
 
     // free old stuff
     aa_mem_region_release( &cx->modereg );
@@ -199,7 +199,7 @@ int set_mode_trajx_w_right(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 
 static int collect_trajq(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl, double *q0, size_t n ) {
     if( msg_ctrl->n < n+1 ) return -1;
-    zero_refs(cx);
+    pir_zero_refs(cx);
 
     // free old stuff
     aa_mem_region_release( &cx->modereg );
@@ -236,7 +236,7 @@ int set_mode_trajq_lr(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 
 int set_mode_trajq_torso(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
     if( msg_ctrl->n != 2 ) return -1;
-    zero_refs(cx);
+    pir_zero_refs(cx);
 
     // free old stuff
     aa_mem_region_release( &cx->modereg );
@@ -270,7 +270,7 @@ int set_mode_trajq_torso(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
 
 int set_mode_servo_cam(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl )
 {
-    zero_refs(cx);
+    pir_zero_refs(cx);
     if( msg_ctrl->n*sizeof(double) != sizeof( struct servo_cam_cx) ) return -1;
 
     // free old stuff
@@ -284,7 +284,7 @@ int set_mode_servo_cam(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl )
 }
 
 int set_mode_biservo_rel(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl ) {
-    zero_refs(cx);
+    pir_zero_refs(cx);
     if( msg_ctrl->n*sizeof(double) != sizeof( struct biservo_rel_cx) ) return -1;
 
     // free old stuff

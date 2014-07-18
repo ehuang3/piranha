@@ -67,6 +67,8 @@ static void control(void);
 
 static void control_n( uint32_t n, size_t i, ach_channel_t *chan );
 
+int set_mode_bisplend(pirctrl_cx_t *cx, struct pir_msg *msg_ctrl );
+void ctrl_bisplend( pirctrl_cx_t *cx );
 
 struct pir_mode_desc mode_desc[] = {
     {"left-shoulder",
@@ -152,6 +154,10 @@ struct pir_mode_desc mode_desc[] = {
     {"biservo-rel",
      set_mode_biservo_rel,
      ctrl_biservo_rel,
+     NULL},
+    {"bisplend",
+     set_mode_bisplend,
+     ctrl_bisplend,
      NULL},
     {"sdh-set-left",
      sdh_set_left,
