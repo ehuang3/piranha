@@ -523,8 +523,10 @@ static void set_mode(void) {
                                         &frame_size, NULL, ACH_O_LAST );
     if( ACH_OK == r || ACH_MISSED_FRAME == r ) {
         msg_ctrl->mode[63] = '\0';
-        printf( "ctrl_msg: `%s', %"PRIu64" (%"PRIu64")\n",
-                msg_ctrl->mode, msg_ctrl->seq_no, msg_ctrl->salt );
+        printf( "ctrl_msg: `%s', seqno: %"PRIu64", salt: %"PRIu64", n: %"PRIu64"\n",
+                msg_ctrl->mode, msg_ctrl->seq_no, msg_ctrl->salt,
+                msg_ctrl->n
+		);
         for( size_t i = 0; mode_desc[i].name != NULL; i ++ ) {
             if( 0 == strcmp(msg_ctrl->mode, mode_desc[i].name) ) {
                 printf("found mode: %s\n", mode_desc[i].name);

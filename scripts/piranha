@@ -31,16 +31,17 @@
 # STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 # OF THE POSSIBILITY OF SUCH DAMAGE.
-
-if test -x ~/local/etc/init.d/sns; then
-    SNS=~/local/etc/init.d/sns
-elif test -x /usr/local/etc/init.d/sns; then
-    SNS=/usr/local/etc/init.d/sns
-elif test -x /etc/init.d/sns; then
-    SNS=/etc/init.d/sns
-else
-    echo "Could not find SNS program"
-    exit 1
+if test -z $SNS; then
+    if test -x ~/local/etc/init.d/sns; then
+	SNS=~/local/etc/init.d/sns
+    elif test -x /usr/local/etc/init.d/sns; then
+	SNS=/usr/local/etc/init.d/sns
+    elif test -x /etc/init.d/sns; then
+	SNS=/etc/init.d/sns
+    else
+	echo "Could not find SNS program"
+	exit 1
+    fi
 fi
 
 CHANNELS="ref-torso state-torso ref-left state-left ref-right state-right"
@@ -118,6 +119,23 @@ pir_stop() {
     $SNS kill sdh-right
 }
 
+pir_steal() {
+    chown -R $1 /var/run/sns/lwa-left   \
+	/var/run/sns/lwa-right          \
+	/var/run/sns/torso              \
+	/var/run/sns/ft-left            \
+	/var/run/sns/ft-right           \
+	/var/run/sns/sdh-left           \
+	/var/run/sns/sdh-right          \
+	/var/tmp/sns/lwa-left           \
+	/var/tmp/sns/lwa-right          \
+	/var/tmp/sns/torso              \
+	/var/tmp/sns/ft-left            \
+	/var/tmp/sns/ft-right           \
+	/var/tmp/sns/sdh-left           \
+	/var/tmp/sns/sdh-right
+}
+
 case "$1" in
     start)
         pir_start
@@ -131,6 +149,9 @@ case "$1" in
     mk)
         pir_ach_mk
         ;;
+   steal)
+	shift
+        pir_steal $@
     expunge)
         pir_expunge
         ;;
